@@ -3,10 +3,22 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 require("dotenv").config();
 
+const authRoutes = require("./routes/authRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+
+// Base route
+app.get("/", (req, res) => {
+  res.json({ message: "Welcome to StudyHub API" });
+});
 
 mongoose
   .connect(process.env.MONGO_URI)
