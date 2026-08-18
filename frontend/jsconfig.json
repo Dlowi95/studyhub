@@ -3,6 +3,7 @@
     "target": "ES6",
     "module": "esnext",
     "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
     "paths": {

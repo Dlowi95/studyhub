@@ -88,7 +88,7 @@ function App() {
           <div className="container mx-auto flex items-center justify-between">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2.5 group">
-              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-lg shadow-sm group-hover:opacity-90 transition-opacity">
+<div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-lg shadow-sm group-hover:opacity-90 transition-opacity">
                 S
               </div>
               <span className="text-xl font-bold tracking-tight text-slate-900">
@@ -146,7 +146,7 @@ function App() {
                     onClick={handleLogout} 
                     title="Đăng xuất"
                     className="p-2 text-slate-400 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-                  >
+>
                     <LogOut className="w-4 h-4" />
                   </button>
                 </div>
