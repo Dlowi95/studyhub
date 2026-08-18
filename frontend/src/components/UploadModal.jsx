@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UploadCloud, CheckCircle2, FileText, AlertCircle, Loader2 } from "lucide-react";
+import { UploadCloud, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
   const [title, setTitle] = useState("");
@@ -23,7 +23,7 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
     "Vật lý đại cương",
     "Kinh tế vĩ mô",
     "Mạng máy tính",
-    "Khác"
+    "Khác",
   ];
 
   const handleFileChange = (e) => {
@@ -36,7 +36,6 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
       setError("");
       setFile(selectedFile);
       if (!title) {
-        // Auto fill title from filename without extension
         const cleanName = selectedFile.name.replace(/\.[^/.]+$/, "");
         setTitle(cleanName);
       }
@@ -50,26 +49,45 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
       return;
     }
 
+    if (!title || !subject) {
+      setError("Vui lòng nhập tiêu đề và chọn môn học.");
+      return;
+    }
+
     setError("");
     setLoading(true);
 
-    // Simulate upload submission (ready to plug in formData to /api/documents)
-    setTimeout(() => {
+    try {
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("description", `${docType} - ${subject}`);
+      formData.append("subjectName", subject);
+      formData.append("tags", subject);
+      formData.append("fileType", file.name.split(".").pop()?.toUpperCase() || "FILE");
+      formData.append("file", file);
+
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("Bạn cần đăng nhập để upload tài liệu");
+      }
+
+      const res = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/documents/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Upload thất bại");
+      }
+
       setLoading(false);
       setSuccess(true);
-      const newDoc = {
-        id: "doc-" + Date.now(),
-        title,
-        subject: subject || "Chung",
-        downloads: 0,
-        rating: 5.0,
-        type: file.name.endsWith(".docx") ? "DOCX" : "PDF",
-        uploader: "Tôi",
-        isVerified: false,
-        size: (file.size / (1024 * 1024)).toFixed(1) + " MB",
-      };
-
-      onUploadSuccess?.(newDoc);
+      onUploadSuccess?.(data.document);
 
       setTimeout(() => {
         setSuccess(false);
@@ -78,7 +96,10 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
         setFile(null);
         onClose();
       }, 1400);
-    }, 800);
+    } catch (err) {
+      setLoading(false);
+      setError(err.message || "Không thể upload tài liệu");
+    }
   };
 
   return (
@@ -112,7 +133,6 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
               </div>
             )}
 
-            {/* File Dropzone */}
             <div className="space-y-1.5 text-left">
               <Label className="text-xs font-semibold text-slate-700">File tài liệu (PDF, DOCX)</Label>
               <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-200 hover:border-primary/50 hover:bg-slate-50 rounded-xl cursor-pointer transition-all">
@@ -134,7 +154,6 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
               </label>
             </div>
 
-            {/* Title */}
             <div className="space-y-1.5 text-left">
               <Label htmlFor="upload-title" className="text-xs font-semibold text-slate-700">
                 Tiêu đề tài liệu
@@ -150,7 +169,6 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
               />
             </div>
 
-            {/* Subject and Doc Type Grid */}
             <div className="grid grid-cols-2 gap-3 text-left">
               <div className="space-y-1.5">
                 <Label htmlFor="upload-subject" className="text-xs font-semibold text-slate-700">
@@ -208,3 +226,4 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
     </Dialog>
   );
 }
+

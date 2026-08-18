@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ export default function Profile() {
       }
 
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/profile`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/auth/profile`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -128,3 +128,4 @@ export default function Profile() {
     </div>
   );
 }
+
