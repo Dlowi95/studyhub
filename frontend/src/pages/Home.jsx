@@ -1,145 +1,233 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Search, FileText, Download, Star } from "lucide-react";
+import { Search, FileText, UploadCloud, ShieldCheck } from "lucide-react";
+import DocumentCard from "@/components/DocumentCard";
+import SubjectFilter from "@/components/SubjectFilter";
+import ReportModal from "@/components/ReportModal";
+import UploadModal from "@/components/UploadModal";
 
-export default function Home() {
+export default function Home({ onOpenAuth, user }) {
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // Mock documents representing Studocu/CourseHero style
-  const mockDocuments = [
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [activeDocForReport, setActiveDocForReport] = useState(null);
+
+  // Initial mock documents for demonstration
+  const [documents, setDocuments] = useState([
     {
       id: "doc-1",
-      title: "Đề cương ôn tập Triết học Mác-Lênin (Full 12 Chương)",
+      title: "Đề cương ôn tập Triết học Mác-Lênin (12 chương có lời giải)",
       subject: "Triết học Mác-Lênin",
       downloads: 1420,
       rating: 4.8,
       type: "PDF",
       uploader: "Huy Thịnh",
+      isVerified: true,
+      size: "2.4 MB",
     },
     {
       id: "doc-2",
-      title: "Giáo trình Cấu trúc dữ liệu và Giải thuật - ĐH Bách Khoa",
-      subject: "Cấu trúc dữ liệu & Giải thuật",
+      title: "Giáo trình và bài tập Cấu trúc dữ liệu và Giải thuật",
+      subject: "Cấu trúc dữ liệu",
       downloads: 850,
       rating: 5.0,
       type: "PDF",
       uploader: "Lâm Nguyễn",
+      isVerified: true,
+      size: "5.1 MB",
     },
     {
       id: "doc-3",
-      title: "Đề thi cuối kỳ Giải tích 1 có đáp án chi tiết (2025)",
-      subject: "Giải tích 1",
+      title: "Đề thi cuối kỳ Giải tích 1 có đáp án chi tiết kỳ 2024.2",
+      subject: "Giải tích",
       downloads: 2100,
       rating: 4.6,
       type: "DOCX",
-      uploader: "Admin",
+      uploader: "Ban Học Tập",
+      isVerified: true,
+      size: "1.8 MB",
     },
     {
       id: "doc-4",
-      title: "Tóm tắt công thức Vật lý đại cương 1",
-      subject: "Vật lý đại cương 1",
+      title: "Tóm tắt công thức và bài tập Vật lý đại cương 1",
+      subject: "Vật lý đại cương",
       downloads: 620,
       rating: 4.7,
       type: "PDF",
       uploader: "Thành Đạt",
+      isVerified: true,
+      size: "3.2 MB",
     },
+  ]);
+
+  const subjects = [
+    "Tất cả",
+    "Giải tích",
+    "Đại số tuyến tính",
+    "Triết học Mác-Lênin",
+    "Cấu trúc dữ liệu",
+    "Vật lý đại cương",
+    "Kinh tế vĩ mô"
   ];
 
-  const filteredDocs = mockDocuments.filter(doc => 
-    doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    doc.subject.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleUploadClick = () => {
+    if (!user) {
+      onOpenAuth?.("login");
+    } else {
+      setUploadModalOpen(true);
+    }
+  };
+
+  const handleReportClick = (doc) => {
+    if (!user) {
+      onOpenAuth?.("login");
+    } else {
+      setActiveDocForReport(doc);
+      setReportModalOpen(true);
+    }
+  };
+
+  const handleViewDoc = (doc) => {
+    alert(`Xem trước tài liệu: "${doc.title}" (Đang chuẩn bị trang chi tiết)`);
+  };
+
+  const handleNewUploadSuccess = (newDoc) => {
+    setDocuments([newDoc, ...documents]);
+  };
+
+  const filteredDocs = documents.filter((doc) => {
+    const matchesSearch =
+      doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.subject.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSubject =
+      !selectedSubject ||
+      doc.subject.toLowerCase().includes(selectedSubject.toLowerCase());
+    return matchesSearch && matchesSubject;
+  });
 
   return (
-    <div className="space-y-12">
-      {/* Hero Search Section */}
-      <section className="text-center py-12 px-4 rounded-3xl bg-gradient-to-r from-primary/10 via-sky-500/5 to-primary/5 border border-muted/30 max-w-5xl mx-auto space-y-6">
-        <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 px-3 py-1 text-xs">
-          Nền tảng chia sẻ tài liệu học tập
-        </Badge>
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight max-w-3xl mx-auto leading-tight">
-          Tìm kiếm tài liệu học tập, học phần & đề thi mẫu
+    <div className="space-y-12 max-w-6xl mx-auto">
+      {/* Hero Section */}
+      <section className="text-center py-14 px-6 rounded-3xl bg-gradient-to-b from-emerald-50/60 to-slate-50 border border-slate-200/80 shadow-xs relative overflow-hidden space-y-6">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100/70 text-emerald-800 text-xs font-semibold">
+          <ShieldCheck className="w-3.5 h-3.5" />
+          <span>Tài liệu học tập có kiểm duyệt</span>
+        </div>
+
+        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight max-w-3xl mx-auto text-slate-900 leading-tight">
+          Kho tài liệu học tập, học phần và đề thi chất lượng cao
         </h1>
-        <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-          Tài liệu được chia sẻ và kiểm duyệt bởi cộng đồng sinh viên các trường đại học.
+
+        <p className="text-slate-600 text-sm md:text-base max-w-xl mx-auto">
+          Tìm kiếm, tải về tài liệu và cùng nhau chia sẻ đề cương ôn thi từ sinh viên các trường đại học.
         </p>
-        
+
         {/* Search Bar */}
-        <div className="relative max-w-2xl mx-auto flex items-center gap-2">
-          <div className="relative flex-grow">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5" />
+        <div className="relative max-w-2xl mx-auto flex flex-col sm:flex-row items-center gap-2 pt-2">
+          <div className="relative w-full">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
             <Input
               type="text"
-              placeholder="Nhập tên tài liệu, môn học hoặc từ khoá ôn tập..."
+              placeholder="Nhập tên môn học, học phần, đề thi (vd: Giải tích 1, Triết học...)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-12 text-md shadow-sm border-muted-foreground/20 rounded-xl"
+              className="pl-11 h-12 text-sm md:text-base bg-white shadow-sm border-slate-200 rounded-xl focus-visible:ring-primary"
             />
           </div>
-          <Button className="h-12 px-6 rounded-xl font-medium">Tìm kiếm</Button>
+          <Button className="w-full sm:w-auto h-12 px-6 rounded-xl font-semibold bg-primary text-white shadow-sm hover:bg-primary/90">
+            Tìm kiếm
+          </Button>
         </div>
       </section>
 
-      {/* Popular Subjects */}
-      <section className="max-w-5xl mx-auto space-y-4">
-        <h2 className="text-2xl font-bold text-left">Học phần phổ biến</h2>
-        <div className="flex flex-wrap gap-2">
-          {["Giải tích", "Đại số tuyến tính", "Triết học", "Lập trình C++", "Cấu trúc dữ liệu", "Vật lý đại cương", "Kinh tế vĩ mô"].map((sub, idx) => (
-            <Badge key={idx} onClick={() => setSearchQuery(sub)} variant="secondary" className="cursor-pointer hover:bg-muted/80 px-3 py-1.5 text-sm rounded-lg font-medium">
-              {sub}
-            </Badge>
-          ))}
-        </div>
+      {/* Subject Filter Section */}
+      <section id="subjects">
+        <SubjectFilter
+          subjects={subjects}
+          selectedSubject={selectedSubject}
+          onSelectSubject={setSelectedSubject}
+        />
       </section>
 
-      {/* Documents Grid */}
-      <section className="max-w-5xl mx-auto space-y-6">
+      {/* Documents Grid Section */}
+      <section id="featured" className="space-y-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Tài liệu nổi bật</h2>
-          <span className="text-sm text-muted-foreground font-medium">Hiển thị {filteredDocs.length} tài liệu</span>
+          <h2 className="text-lg md:text-xl font-bold text-slate-900">
+            Tài liệu nổi bật
+          </h2>
+          <span className="text-xs md:text-sm text-slate-500 font-medium">
+            Hiển thị {filteredDocs.length} tài liệu
+          </span>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredDocs.map((doc) => (
-            <Card key={doc.id} className="hover:shadow-md transition-shadow border-muted/60 text-left">
-              <CardHeader className="pb-3 flex flex-row items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[10px] uppercase font-bold">
-                    {doc.subject}
-                  </Badge>
-                  <CardTitle className="text-lg font-semibold line-clamp-2 hover:text-primary transition-colors cursor-pointer pt-1">
-                    {doc.title}
-                  </CardTitle>
-                </div>
-                <div className="p-2 bg-primary/5 text-primary rounded-lg shrink-0">
-                  <FileText className="w-6 h-6" />
-                </div>
-              </CardHeader>
-              <CardContent className="pb-4">
-                <div className="flex items-center justify-between text-sm text-muted-foreground border-t pt-3">
-                  <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1">
-                      <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                      <span className="font-semibold text-foreground">{doc.rating}</span>
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Download className="w-4 h-4" />
-                      <span>{doc.downloads}</span>
-                    </span>
-                  </div>
-                  <div>
-                    Người tải: <span className="font-medium text-foreground">{doc.uploader}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+
+        {filteredDocs.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200 space-y-3">
+            <FileText className="w-10 h-10 text-slate-300 mx-auto" />
+            <p className="text-slate-600 font-medium text-sm">
+              Không tìm thấy tài liệu phù hợp với từ khóa này
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSearchQuery("");
+                setSelectedSubject("");
+              }}
+            >
+              Xem tất cả tài liệu
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {filteredDocs.map((doc) => (
+              <DocumentCard
+                key={doc.id}
+                doc={doc}
+                onReport={handleReportClick}
+                onView={handleViewDoc}
+              />
+            ))}
+          </div>
+        )}
       </section>
+
+      {/* Upload CTA Section */}
+      <section className="p-8 rounded-3xl bg-slate-900 text-white shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="space-y-2 text-center md:text-left">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800 text-xs font-semibold text-slate-300">
+            <span>Thư viện tài liệu mở StudyHub</span>
+          </div>
+          <h3 className="text-2xl font-bold">Bạn có tài liệu học tập hoặc đề thi?</h3>
+          <p className="text-slate-300 text-sm max-w-lg">
+            Đăng tải tài liệu của bạn để hỗ trợ sinh viên khác trong việc ôn tập và học tập hiệu quả.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleUploadClick}
+          className="shrink-0 px-6 py-3 bg-white text-slate-900 hover:bg-slate-100 font-bold text-sm rounded-xl shadow-xs transition-all active:scale-95 flex items-center gap-2"
+        >
+          <UploadCloud className="w-4 h-4 text-emerald-700" />
+          <span>Chia sẻ tài liệu ngay</span>
+        </button>
+      </section>
+
+      {/* Reusable Report Modal */}
+      <ReportModal
+        isOpen={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        document={activeDocForReport}
+      />
+
+      {/* Reusable Upload Modal */}
+      <UploadModal
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        onUploadSuccess={handleNewUploadSuccess}
+      />
     </div>
   );
 }

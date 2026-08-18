@@ -18,15 +18,11 @@ exports.register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // Auto-bootstrap: First user is admin, all others are student
-    const userCount = await User.countDocuments();
-    const assignedRole = userCount === 0 ? "admin" : "student";
-
     const newUser = new User({
       name,
       email,
       passwordHash,
-      role: assignedRole,
+      role: "student",
       status: "active",
     });
 
