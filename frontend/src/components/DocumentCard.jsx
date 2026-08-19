@@ -55,7 +55,7 @@ export default function DocumentCard({ doc, onReport, onView }) {
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
               <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-              <span className="font-semibold text-slate-800">{doc.rating ?? 4.8}</span>
+              <span className="font-semibold text-slate-800">{doc.rating ?? 0}</span>
             </span>
             <span className="flex items-center gap-1">
               <Download className="w-3.5 h-3.5 text-slate-400" />

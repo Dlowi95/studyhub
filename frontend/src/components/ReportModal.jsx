@@ -2,12 +2,16 @@ import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 export default function ReportModal({ isOpen, onClose, document: doc }) {
   const [reason, setReason] = useState("wrong_subject");
   const [details, setDetails] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState("");
 
   const reportReasons = [
     { value: "wrong_subject", label: "Sai học phần / môn học" },
@@ -17,15 +21,52 @@ export default function ReportModal({ isOpen, onClose, document: doc }) {
     { value: "other", label: "Lý do khác" },
   ];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      setDetails("");
-      setReason("wrong_subject");
-      onClose();
-    }, 1200);
+    if (!doc?.id && !doc?._id) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setApiError("Bạn cần đăng nhập để gửi báo cáo.");
+      return;
+    }
+
+    // Tìm nhãn tiếng Việt tương ứng với value đã chọn (bắt buộc khai báo TRƯỚC khi dùng bên dưới)
+    const reasonLabel = reportReasons.find((r) => r.value === reason)?.label || reason;
+
+    setLoading(true);
+    setApiError("");
+    try {
+      const res = await fetch(`${API_URL}/reports`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          documentId: doc.id || doc._id,
+          reason: details.trim() ? `${reasonLabel}: ${details.trim()}` : reasonLabel,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Gửi báo cáo thất bại");
+      }
+
+      setSubmitted(true);
+      setTimeout(() => {
+        setSubmitted(false);
+        setDetails("");
+        setReason("wrong_subject");
+        setApiError("");
+        onClose();
+      }, 1800);
+    } catch (err) {
+      setApiError(err.message || "Có lỗi xảy ra, vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -50,6 +91,12 @@ export default function ReportModal({ isOpen, onClose, document: doc }) {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+            {apiError && (
+              <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                {apiError}
+              </div>
+            )}
             <div className="space-y-2 text-left">
               <Label className="text-xs font-semibold text-slate-700">Lý do báo cáo</Label>
               <div className="space-y-1.5">
@@ -87,10 +134,11 @@ export default function ReportModal({ isOpen, onClose, document: doc }) {
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0 pt-2">
-              <Button type="button" variant="outline" size="sm" onClick={onClose}>
+              <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={loading}>
                 Hủy
               </Button>
-              <Button type="submit" size="sm" className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+              <Button type="submit" size="sm" disabled={loading} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                {loading && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
                 Gửi báo cáo
               </Button>
             </DialogFooter>

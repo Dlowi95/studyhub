@@ -4,6 +4,8 @@ import DocumentCard from "@/components/DocumentCard";
 import DocumentDetailActions from "@/components/DocumentDetailActions";
 import DocumentDetailHeader from "@/components/DocumentDetailHeader";
 import DocumentDetailMeta from "@/components/DocumentDetailMeta";
+import DocumentDetailReviews from "@/components/DocumentDetailReviews";
+import ReportModal from "@/components/ReportModal";
 import { Button } from "@/components/ui/button";
 
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -14,7 +16,7 @@ const normalizeDocument = (doc) => ({
   subject: doc.subjectName || doc.subjectId?.name || "Khác",
   subjectName: doc.subjectName || doc.subjectId?.name || "Khác",
   downloads: doc.downloadCount || 0,
-  rating: doc.avgRating || 4.8,
+  rating: doc.avgRating || 0,
   type: (doc.fileType || "PDF").toString().toUpperCase(),
   uploader: doc.uploaderId?.name || "StudyHub",
   isVerified: doc.status === "approved",
@@ -26,7 +28,7 @@ const normalizeDocument = (doc) => ({
   createdAt: doc.createdAt,
   viewCount: doc.viewCount || 0,
   downloadCount: doc.downloadCount || 0,
-  avgRating: doc.avgRating || 4.8,
+  avgRating: doc.avgRating || 0,
   uploaderId: doc.uploaderId,
 });
 
@@ -37,6 +39,20 @@ export default function DocumentDetailPage() {
   const [relatedDocs, setRelatedDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [avgRating, setAvgRating] = useState(null);
+
+  // Report modal state
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportTargetDoc, setReportTargetDoc] = useState(null);
+
+  const openReportModal = (targetDoc) => {
+    setReportTargetDoc(targetDoc);
+    setReportModalOpen(true);
+  };
+  const closeReportModal = () => {
+    setReportModalOpen(false);
+    setReportTargetDoc(null);
+  };
 
   useEffect(() => {
     const loadDocument = async () => {
@@ -55,6 +71,7 @@ export default function DocumentDetailPage() {
 
         const normalizedDoc = normalizeDocument(detailData);
         setDoc(normalizedDoc);
+        setAvgRating(normalizedDoc.avgRating);
 
         if (normalizedDoc.subjectName) {
           const relatedRes = await fetch(
@@ -62,14 +79,14 @@ export default function DocumentDetailPage() {
           );
 
           const relatedData = await relatedRes.json();
-          if (relatedRes.ok && Array.isArray(relatedData)) {
-            setRelatedDocs(
-              relatedData
-                .map(normalizeDocument)
-                .filter((item) => item.id !== normalizedDoc.id)
-                .slice(0, 3)
-            );
-          }
+if (relatedRes.ok && Array.isArray(relatedData.items)) {
+  setRelatedDocs(
+    relatedData.items
+      .map(normalizeDocument)
+      .filter((item) => item.id !== normalizedDoc.id)
+      .slice(0, 3)
+  );
+}
         }
       } catch (err) {
         setError(err.message || "Không thể tải tài liệu");
@@ -142,12 +159,17 @@ export default function DocumentDetailPage() {
           <DocumentDetailActions
             doc={doc}
             onDownload={handleDownload}
-            onReport={() => {
-              alert("Chức năng báo cáo tài liệu đang được phát triển.");
-            }}
+            onReport={openReportModal}
           />
         </div>
       </div>
+
+      {/* Khu vực đánh giá */}
+      <DocumentDetailReviews
+        documentId={doc.id}
+        avgRating={avgRating}
+        onAvgRatingChange={(newAvg) => setAvgRating(newAvg)}
+      />
 
       {relatedDocs.length > 0 && (
         <div className="space-y-5">
@@ -162,14 +184,18 @@ export default function DocumentDetailPage() {
                 key={item.id}
                 doc={item}
                 onView={(relatedDoc) => navigate(`/documents/${relatedDoc.id}`)}
-                onReport={() => {
-                  alert("Chức năng báo cáo tài liệu đang được phát triển.");
-                }}
+                onReport={openReportModal}
               />
             ))}
           </div>
         </div>
       )}
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={reportModalOpen}
+        onClose={closeReportModal}
+        document={reportTargetDoc}
+      />
     </div>
   );
 }

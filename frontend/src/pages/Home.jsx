@@ -33,7 +33,7 @@ export default function Home({ onOpenAuth, user }) {
     title: doc.title || "Tài liệu chưa có tiêu đề",
     subject: doc.subjectName || doc.subjectId?.name || "Khác",
     downloads: doc.downloadCount || 0,
-    rating: doc.avgRating || 4.8,
+    rating: doc.avgRating || 0,
     type: (doc.fileType || "PDF").toString().toUpperCase(),
     uploader: doc.uploaderId?.name || "StudyHub",
     isVerified: doc.status === "approved",
@@ -51,7 +51,7 @@ export default function Home({ onOpenAuth, user }) {
         throw new Error(data.message || "Không thể tải tài liệu");
       }
 
-      setDocuments(Array.isArray(data) ? data.map(normalizeDocument) : []);
+      setDocuments(Array.isArray(data.items) ? data.items.map(normalizeDocument) : []);
     } catch (error) {
       console.error(error);
       setDocuments([]);

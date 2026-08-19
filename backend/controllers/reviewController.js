@@ -1,10 +1,11 @@
+const mongoose = require('mongoose');
 const Review = require('../models/review');
-const Document = require('../models/document'); // do Thành viên 2 tạo
+const Document = require('../models/Document'); // do Thành viên 2 tạo
 
 // Hàm nội bộ: tính lại avgRating cho 1 document sau khi review thay đổi
 async function recalculateAvgRating(documentId) {
   const stats = await Review.aggregate([
-    { $match: { documentId } },
+    { $match: { documentId: new mongoose.Types.ObjectId(documentId) } },
     {
       $group: {
         _id: '$documentId',

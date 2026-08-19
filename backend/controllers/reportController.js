@@ -1,5 +1,5 @@
 const Report = require('../models/report');
-const Document = require('../models/document'); // do Thành viên 2 tạo
+const Document = require('../models/Document'); // do Thành viên 2 tạo
 
 // POST /api/reports
 exports.createReport = async (req, res) => {

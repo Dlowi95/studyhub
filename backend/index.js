@@ -10,6 +10,8 @@ require("dotenv").config();
 const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const documentRoutes = require("./routes/documentRoutes");
+const reportRoutes = require("./routes/reportRoutes");   
+const reviewRoutes = require("./routes/reviewRoutes");   
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -32,6 +34,9 @@ app.use("/api/admin", adminRoutes);
 
 app.use("/api/documents", documentRoutes);
 
+app.use("/api", reportRoutes);   
+app.use("/api", reviewRoutes);
+
 // Base route
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to StudyHub API" });
@@ -39,7 +44,11 @@ app.get("/", (req, res) => {
 
 mongoose
   .connect(mongoUri, {
-    serverSelectionTimeoutMS: 5000,
+    serverSelectionTimeoutMS: 30000,
+    connectTimeoutMS: 30000,
+    socketTimeoutMS: 30000,
+    tls: true,
+    tlsAllowInvalidCertificates: false,
   })
   .then(() => {
     console.log("MongoDB connected successfully");
