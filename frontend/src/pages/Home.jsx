@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, FileText, UploadCloud, ShieldCheck } from "lucide-react";
@@ -8,6 +9,7 @@ import ReportModal from "@/components/ReportModal";
 import UploadModal from "@/components/UploadModal";
 
 export default function Home({ onOpenAuth, user }) {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("");
   const [reportModalOpen, setReportModalOpen] = useState(false);
@@ -90,7 +92,7 @@ export default function Home({ onOpenAuth, user }) {
   };
 
   const handleViewDoc = (doc) => {
-    alert(`Xem trước tài liệu: "${doc.title}" (Đang chuẩn bị trang chi tiết)`);
+    navigate(`/document/${doc.id}`);
   };
 
   const handleNewUploadSuccess = (newDoc) => {
