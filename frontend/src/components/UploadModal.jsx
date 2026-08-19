@@ -71,23 +71,37 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
     setError("");
     setLoading(true);
 
-    // Simulate API upload
-    setTimeout(() => {
+    try {
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("description", description || `${docType} - ${subject}`);
+      formData.append("subjectName", subject);
+      formData.append("tags", subject);
+      formData.append("fileType", file.name.split(".").pop()?.toUpperCase() || "FILE");
+      formData.append("file", file);
+
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("Bạn cần đăng nhập để upload tài liệu");
+      }
+
+      const res = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/documents/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Upload thất bại");
+      }
+
       setLoading(false);
       setSuccess(true);
-      const newDoc = {
-        id: "doc-" + Date.now(),
-        title,
-        subject: subject || "Chung",
-        downloads: 0,
-        rating: 5.0,
-        type: file.name.endsWith(".docx") ? "DOCX" : file.name.endsWith(".pptx") ? "PPTX" : "PDF",
-        uploader: "Tôi",
-        isVerified: false,
-        size: (file.size / (1024 * 1024)).toFixed(1) + " MB",
-      };
-
-      onUploadSuccess?.(newDoc);
+      onUploadSuccess?.(data.document);
 
       setTimeout(() => {
         setSuccess(false);
@@ -98,7 +112,10 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
         setFile(null);
         onClose();
       }, 1600);
-    }, 900);
+    } catch (err) {
+      setLoading(false);
+      setError(err.message || "Không thể upload tài liệu");
+    }
   };
 
   const handleCloseModal = () => {

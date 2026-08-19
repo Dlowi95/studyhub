@@ -100,7 +100,8 @@ export default function Profile() {
       }
 
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/profile`, {
+        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+        const response = await fetch(`${apiUrl}/auth/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -387,3 +388,4 @@ export default function Profile() {
     </div>
   );
 }
+

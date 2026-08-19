@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,54 +15,8 @@ export default function Home({ onOpenAuth, user }) {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [activeDocForReport, setActiveDocForReport] = useState(null);
-
-  // Initial mock documents for demonstration
-  const [documents, setDocuments] = useState([
-    {
-      id: "doc-1",
-      title: "Đề cương ôn tập Triết học Mác-Lênin (12 chương có lời giải)",
-      subject: "Triết học Mác-Lênin",
-      downloads: 1420,
-      rating: 4.8,
-      type: "PDF",
-      uploader: "Huy Thịnh",
-      isVerified: true,
-      size: "2.4 MB",
-    },
-    {
-      id: "doc-2",
-      title: "Giáo trình và bài tập Cấu trúc dữ liệu và Giải thuật",
-      subject: "Cấu trúc dữ liệu",
-      downloads: 850,
-      rating: 5.0,
-      type: "PDF",
-      uploader: "Lâm Nguyễn",
-      isVerified: true,
-      size: "5.1 MB",
-    },
-    {
-      id: "doc-3",
-      title: "Đề thi cuối kỳ Giải tích 1 có đáp án chi tiết kỳ 2024.2",
-      subject: "Giải tích",
-      downloads: 2100,
-      rating: 4.6,
-      type: "DOCX",
-      uploader: "Ban Học Tập",
-      isVerified: true,
-      size: "1.8 MB",
-    },
-    {
-      id: "doc-4",
-      title: "Tóm tắt công thức và bài tập Vật lý đại cương 1",
-      subject: "Vật lý đại cương",
-      downloads: 620,
-      rating: 4.7,
-      type: "PDF",
-      uploader: "Thành Đạt",
-      isVerified: true,
-      size: "3.2 MB",
-    },
-  ]);
+  const [documents, setDocuments] = useState([]);
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
   const subjects = [
     "Tất cả",
@@ -71,8 +25,42 @@ export default function Home({ onOpenAuth, user }) {
     "Triết học Mác-Lênin",
     "Cấu trúc dữ liệu",
     "Vật lý đại cương",
-    "Kinh tế vĩ mô"
+    "Kinh tế vĩ mô",
   ];
+
+  const normalizeDocument = (doc) => ({
+    id: doc._id || doc.id,
+    title: doc.title || "Tài liệu chưa có tiêu đề",
+    subject: doc.subjectName || doc.subjectId?.name || "Khác",
+    downloads: doc.downloadCount || 0,
+    rating: doc.avgRating || 0,
+    type: (doc.fileType || "PDF").toString().toUpperCase(),
+    uploader: doc.uploaderId?.name || "StudyHub",
+    isVerified: doc.status === "approved",
+    size: doc.fileName ? `${Math.max(1, Math.round((doc.fileSize || 2) / 1024 / 1024))} MB` : "2 MB",
+    fileUrl: doc.fileUrl,
+  });
+
+  const fetchApprovedDocuments = async () => {
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+      const response = await fetch(`${apiUrl}/documents?status=approved`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Không thể tải tài liệu");
+      }
+
+      setDocuments(Array.isArray(data.items) ? data.items.map(normalizeDocument) : []);
+    } catch (error) {
+      console.error(error);
+      setDocuments([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchApprovedDocuments();
+  }, []);
 
   const handleUploadClick = () => {
     if (!user) {
@@ -91,21 +79,29 @@ export default function Home({ onOpenAuth, user }) {
     }
   };
 
-  const handleViewDoc = (doc) => {
-    navigate(`/document/${doc.id}`);
+  const handleViewDoc = async (doc) => {
+    if (!doc?.id) return;
+
+    try {
+      await fetch(`${apiUrl}/documents/${doc.id}/view`, { method: "POST" });
+    } catch (e) {
+      // ignore view counter failure
+    }
+
+    navigate(`/documents/${doc.id}`);
   };
 
   const handleNewUploadSuccess = (newDoc) => {
-    setDocuments([newDoc, ...documents]);
+    setDocuments((prev) => [normalizeDocument(newDoc), ...prev]);
   };
 
   const filteredDocs = documents.filter((doc) => {
+    const title = (doc.title || "").toLowerCase();
+    const subject = (doc.subject || "").toLowerCase();
     const matchesSearch =
-      doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.subject.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesSubject =
-      !selectedSubject ||
-      doc.subject.toLowerCase().includes(selectedSubject.toLowerCase());
+      title.includes(searchQuery.toLowerCase()) ||
+      subject.includes(searchQuery.toLowerCase());
+    const matchesSubject = !selectedSubject || selectedSubject === "Tất cả" || subject.includes(selectedSubject.toLowerCase());
     return matchesSearch && matchesSubject;
   });
 

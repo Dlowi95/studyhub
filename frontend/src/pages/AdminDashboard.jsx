@@ -19,19 +19,16 @@ import {
   Lock,
   Unlock,
   Search,
-  Filter,
-  ArrowUpRight,
+  ExternalLink,
 } from "lucide-react";
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("pending"); // "pending" | "reports" | "users"
   const [users, setUsers] = useState([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const [error, setError] = useState("");
+  const [pendingDocs, setPendingDocs] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [currentAdmin, setCurrentAdmin] = useState(null);
-  const navigate = useNavigate();
-
-  // Search filter inside tables
   const [searchQuery, setSearchQuery] = useState("");
 
   // Reject Modal state
@@ -39,85 +36,59 @@ export default function AdminDashboard() {
   const [selectedPendingDoc, setSelectedPendingDoc] = useState(null);
   const [rejectReason, setRejectReason] = useState("Tài liệu không rõ nguồn gốc hoặc chất lượng kém");
 
-  // Mock pending documents queue (Tab 1)
-  const [pendingDocs, setPendingDocs] = useState([
-    {
-      id: "pen-1",
-      title: "Đề thi giữa kỳ môn Kinh tế vi mô có đáp án - ĐH Kinh tế Quốc Dân",
-      subject: "Kinh tế vi mô",
-      type: "PDF",
-      size: "3.4 MB",
-      uploader: "Trần Minh Quân",
-      uploaderEmail: "quan.tm@example.com",
-      createdAt: "18/02/2026",
-      status: "pending",
-    },
-    {
-      id: "pen-2",
-      title: "Slide bài giảng Hệ điều hành chương 1 đến chương 5",
-      subject: "Hệ điều hành",
-      type: "PPTX",
-      size: "8.2 MB",
-      uploader: "Phạm Thúy Hằng",
-      uploaderEmail: "hang.pt@example.com",
-      createdAt: "17/02/2026",
-      status: "pending",
-    },
-    {
-      id: "pen-3",
-      title: "Đề cương trắc nghiệm Pháp luật đại cương (300 câu hỏi)",
-      subject: "Pháp luật đại cương",
-      type: "DOCX",
-      size: "1.5 MB",
-      uploader: "Ngô Văn Hùng",
-      uploaderEmail: "hung.nv@example.com",
-      createdAt: "16/02/2026",
-      status: "pending",
-    },
-  ]);
+  const navigate = useNavigate();
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
-  // Mock reports management (Tab 2)
-  const [reports, setReports] = useState([
-    {
-      id: "rep-1",
-      docId: "doc-1",
-      docTitle: "Tóm tắt công thức Vật lý đại cương 1",
-      reporter: "Nguyễn Văn Tuấn",
-      reason: "Nội dung sai lệch, đề thi lỗi đáp án",
-      details: "Công thức phần Dao động điều hòa trang 3 bị sai dấu âm.",
-      reportedAt: "17/02/2026",
-      status: "pending",
-    },
-    {
-      id: "rep-2",
-      docId: "doc-3",
-      docTitle: "Tài liệu ôn tập Cơ sở dữ liệu kỳ 2025.1",
-      reporter: "Lê Hoàng Yến",
-      reason: "Vi phạm bản quyền / Tài liệu cấm chia sẻ",
-      details: "Tài liệu này là đề thi nội bộ chưa được giảng viên cho phép công bố.",
-      reportedAt: "15/02/2026",
-      status: "pending",
-    },
-  ]);
-
-  // Fetch users from API (Tab 3)
-  const fetchUsers = async () => {
+  const getAuthHeaders = () => {
     const token = localStorage.getItem("token");
-    if (!token) return;
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+  };
 
-    setLoadingUsers(true);
+  // Fetch Pending Documents
+  const fetchPendingDocuments = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/users`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`${apiUrl}/admin/documents?status=pending`, {
+        headers: getAuthHeaders(),
       });
-      const data = await response.json();
-      if (response.ok) {
-        setUsers(data);
+      const data = await res.json();
+      if (res.ok) {
+        setPendingDocs(Array.isArray(data) ? data : []);
       }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingUsers(false);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Fetch Reports
+  const fetchReports = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/reports`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setReports(Array.isArray(data.items) ? data.items : Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Fetch Users
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/admin/users`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUsers(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -130,73 +101,109 @@ export default function AdminDashboard() {
         console.error(e);
       }
     }
+    fetchPendingDocuments();
+    fetchReports();
     fetchUsers();
   }, []);
 
-  // Handlers for Tab 1: Pending Moderation
-  const handleApproveDoc = (docId) => {
-    setPendingDocs(pendingDocs.filter((d) => d.id !== docId));
-    alert("Đã phê duyệt tài liệu thành công. Tài liệu hiện đã hiển thị công khai.");
-  };
-
-  const handleOpenRejectModal = (doc) => {
-    setSelectedPendingDoc(doc);
-    setRejectModalOpen(true);
-  };
-
-  const handleConfirmReject = () => {
-    if (!selectedPendingDoc) return;
-    setPendingDocs(pendingDocs.filter((d) => d.id !== selectedPendingDoc.id));
-    setRejectModalOpen(false);
-    alert(`Đã từ chối tài liệu: "${selectedPendingDoc.title}". Lý do: ${rejectReason}`);
-  };
-
-  // Handlers for Tab 2: Reports
-  const handleDismissReport = (reportId) => {
-    setReports(reports.filter((r) => r.id !== reportId));
-    alert("Đã bỏ qua báo cáo.");
-  };
-
-  const handleRemoveReportedDoc = (reportId, docTitle) => {
-    setReports(reports.filter((r) => r.id !== reportId));
-    alert(`Đã gỡ bỏ tài liệu vi phạm: "${docTitle}".`);
-  };
-
-  // Handlers for Tab 3: Users
-  const toggleUserStatus = async (userId, currentStatus) => {
-    const token = localStorage.getItem("token");
-    const newStatus = currentStatus === "active" ? "blocked" : "active";
-
+  // Approve Document
+  const handleApproveDoc = async (docId) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/users/${userId}/status`, {
+      const res = await fetch(`${apiUrl}/admin/documents/${docId}/status`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: newStatus }),
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status: "approved" }),
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        alert(data.message || "Không thể cập nhật trạng thái");
-        return;
+      if (res.ok) {
+        setPendingDocs((prev) => prev.filter((d) => (d._id || d.id) !== docId));
+        alert("Đã phê duyệt tài liệu thành công.");
+      } else {
+        const data = await res.json();
+        alert(data.message || "Lỗi khi duyệt tài liệu");
       }
-
-      setUsers((prev) =>
-        prev.map((u) => (u._id === userId ? { ...u, status: newStatus } : u))
-      );
     } catch (err) {
       alert("Lỗi: " + err.message);
     }
   };
 
-  const handleChangeRole = (userId, currentRole) => {
-    const nextRole = currentRole === "student" ? "moderator" : currentRole === "moderator" ? "admin" : "student";
-    setUsers((prev) =>
-      prev.map((u) => (u._id === userId ? { ...u, role: nextRole } : u))
-    );
-    alert(`Đã chuyển vai trò thành viên sang: ${nextRole}`);
+  // Reject Document
+  const handleOpenRejectModal = (doc) => {
+    setSelectedPendingDoc(doc);
+    setRejectModalOpen(true);
+  };
+
+  const handleConfirmReject = async () => {
+    if (!selectedPendingDoc) return;
+    const docId = selectedPendingDoc._id || selectedPendingDoc.id;
+
+    try {
+      const res = await fetch(`${apiUrl}/admin/documents/${docId}/status`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status: "rejected" }),
+      });
+      if (res.ok) {
+        setPendingDocs((prev) => prev.filter((d) => (d._id || d.id) !== docId));
+        setRejectModalOpen(false);
+        alert(`Đã từ chối tài liệu. Lý do: ${rejectReason}`);
+      } else {
+        const data = await res.json();
+        alert(data.message || "Lỗi khi từ chối tài liệu");
+      }
+    } catch (err) {
+      alert("Lỗi: " + err.message);
+    }
+  };
+
+  // Reports
+  const handleDismissReport = async (reportId) => {
+    try {
+      await fetch(`${apiUrl}/reports/${reportId}/status`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status: "dismissed" }),
+      });
+      setReports((prev) => prev.filter((r) => (r._id || r.id) !== reportId));
+    } catch (err) {
+      setReports((prev) => prev.filter((r) => (r._id || r.id) !== reportId));
+    }
+  };
+
+  const handleRemoveReportedDoc = async (reportId, docId) => {
+    try {
+      if (docId) {
+        await fetch(`${apiUrl}/admin/documents/${docId}`, {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        });
+      }
+      setReports((prev) => prev.filter((r) => (r._id || r.id) !== reportId));
+      alert("Đã gỡ bỏ tài liệu vi phạm.");
+    } catch (err) {
+      alert("Lỗi: " + err.message);
+    }
+  };
+
+  // Toggle User Active / Blocked
+  const toggleUserStatus = async (userId, currentStatus) => {
+    const newStatus = currentStatus === "active" ? "blocked" : "active";
+    try {
+      const res = await fetch(`${apiUrl}/admin/users/${userId}/status`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUsers((prev) =>
+          prev.map((u) => (u._id === userId ? { ...u, status: newStatus } : u))
+        );
+      } else {
+        alert(data.message || "Không thể cập nhật trạng thái");
+      }
+    } catch (err) {
+      alert("Lỗi: " + err.message);
+    }
   };
 
   return (
@@ -290,16 +297,12 @@ export default function AdminDashboard() {
       {activeTab === "pending" && (
         <Card className="shadow-xs border-slate-200 rounded-2xl overflow-hidden">
           <CardHeader className="bg-slate-50/50 pb-4 border-b border-slate-100">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-lg font-bold text-slate-900">
-                  Tài liệu đang chờ kiểm duyệt ({pendingDocs.length})
-                </CardTitle>
-                <CardDescription className="text-xs text-slate-500">
-                  Xem xét chất lượng nội dung trước khi phê duyệt hiển thị công khai.
-                </CardDescription>
-              </div>
-            </div>
+            <CardTitle className="text-lg font-bold text-slate-900">
+              Tài liệu đang chờ kiểm duyệt ({pendingDocs.length})
+            </CardTitle>
+            <CardDescription className="text-xs text-slate-500">
+              Xem xét chất lượng nội dung trước khi phê duyệt hiển thị công khai.
+            </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             {pendingDocs.length === 0 ? (
@@ -323,30 +326,39 @@ export default function AdminDashboard() {
                   </TableHeader>
                   <TableBody className="text-xs">
                     {pendingDocs.map((doc) => (
-                      <TableRow key={doc.id} className="hover:bg-slate-50/60">
+                      <TableRow key={doc._id || doc.id} className="hover:bg-slate-50/60">
                         <TableCell className="font-semibold text-slate-900 max-w-xs">
                           <div className="truncate" title={doc.title}>{doc.title}</div>
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="bg-emerald-50 text-emerald-800 border-emerald-200 text-[11px]">
-                            {doc.subject}
+                            {doc.subjectName || doc.subjectId?.name || "Khác"}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           <div>
-                            <div className="font-medium text-slate-800">{doc.uploader}</div>
-                            <div className="text-[10px] text-slate-400">{doc.uploaderEmail}</div>
+                            <div className="font-medium text-slate-800">{doc.uploaderId?.name || "Thành viên"}</div>
+                            <div className="text-[10px] text-slate-400">{doc.uploaderId?.email}</div>
                           </div>
                         </TableCell>
                         <TableCell className="text-slate-600 font-mono">
-                          {doc.type} • {doc.size}
+                          {doc.fileType || "PDF"}
                         </TableCell>
-                        <TableCell className="text-slate-500">{doc.createdAt}</TableCell>
+                        <TableCell className="text-slate-500">
+                          {doc.createdAt ? new Date(doc.createdAt).toLocaleDateString("vi-VN") : "Hôm nay"}
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
+                            {doc.fileUrl && (
+                              <a href={doc.fileUrl} target="_blank" rel="noreferrer">
+                                <Button size="sm" variant="outline" className="h-8 px-2 text-xs rounded-lg border-slate-200">
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </Button>
+                              </a>
+                            )}
                             <Button
                               size="sm"
-                              onClick={() => handleApproveDoc(doc.id)}
+                              onClick={() => handleApproveDoc(doc._id || doc.id)}
                               className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
@@ -406,33 +418,37 @@ export default function AdminDashboard() {
                   </TableHeader>
                   <TableBody className="text-xs">
                     {reports.map((rep) => (
-                      <TableRow key={rep.id} className="hover:bg-slate-50/60">
+                      <TableRow key={rep._id || rep.id} className="hover:bg-slate-50/60">
                         <TableCell className="font-semibold text-slate-900 max-w-xs">
-                          <div className="truncate" title={rep.docTitle}>{rep.docTitle}</div>
+                          <div className="truncate">{rep.documentId?.title || rep.docTitle || "Tài liệu"}</div>
                         </TableCell>
-                        <TableCell className="font-medium text-slate-700">{rep.reporter}</TableCell>
+                        <TableCell className="font-medium text-slate-700">
+                          {rep.reporterId?.name || rep.reporter || "Thành viên"}
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-[11px]">
                             {rep.reason}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-slate-600 max-w-xs truncate" title={rep.details}>
-                          {rep.details}
+                          {rep.details || "Không có mô tả"}
                         </TableCell>
-                        <TableCell className="text-slate-500">{rep.reportedAt}</TableCell>
+                        <TableCell className="text-slate-500">
+                          {rep.createdAt ? new Date(rep.createdAt).toLocaleDateString("vi-VN") : "N/A"}
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleDismissReport(rep.id)}
+                              onClick={() => handleDismissReport(rep._id || rep.id)}
                               className="h-8 px-2.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg"
                             >
                               Bỏ qua
                             </Button>
                             <Button
                               size="sm"
-                              onClick={() => handleRemoveReportedDoc(rep.id, rep.docTitle)}
+                              onClick={() => handleRemoveReportedDoc(rep._id || rep.id, rep.documentId?._id || rep.docId)}
                               className="h-8 px-2.5 bg-destructive hover:bg-destructive/90 text-white text-xs font-semibold rounded-lg"
                             >
                               <Trash2 className="w-3.5 h-3.5 mr-1" />
@@ -460,7 +476,7 @@ export default function AdminDashboard() {
                   Quản lý thành viên ({users.length})
                 </CardTitle>
                 <CardDescription className="text-xs text-slate-500">
-                  Phân quyền tài khoản (Admin, Moderator, Student) và khóa/mở khóa thành viên.
+                  Xem danh sách và khóa/mở khóa tài khoản thành viên.
                 </CardDescription>
               </div>
 
@@ -493,7 +509,7 @@ export default function AdminDashboard() {
                   {users.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-slate-500">
-                        {loadingUsers ? "Đang tải danh sách..." : "Không có thành viên nào."}
+                        {loading ? "Đang tải danh sách..." : "Không có thành viên nào."}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -513,25 +529,18 @@ export default function AdminDashboard() {
                           <TableCell className="font-semibold text-slate-900">{u.name}</TableCell>
                           <TableCell className="text-slate-600">{u.email}</TableCell>
                           <TableCell>
-                            <button
-                              type="button"
-                              onClick={() => handleChangeRole(u._id, u.role)}
-                              title="Bấm để chuyển đổi vai trò"
-                              className="focus:outline-none"
+                            <Badge
+                              variant="outline"
+                              className={`text-[11px] ${
+                                u.role === "admin"
+                                  ? "bg-red-50 text-red-700 border-red-200"
+                                  : u.role === "moderator"
+                                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                                  : "bg-slate-100 text-slate-700 border-slate-200"
+                              }`}
                             >
-                              <Badge
-                                variant="outline"
-                                className={`text-[11px] cursor-pointer hover:opacity-80 ${
-                                  u.role === "admin"
-                                    ? "bg-red-50 text-red-700 border-red-200"
-                                    : u.role === "moderator"
-                                    ? "bg-blue-50 text-blue-700 border-blue-200"
-                                    : "bg-slate-100 text-slate-700 border-slate-200"
-                                }`}
-                              >
-                                {u.role}
-                              </Badge>
-                            </button>
+                              {u.role}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             <Badge
@@ -549,7 +558,7 @@ export default function AdminDashboard() {
                             <Button
                               size="sm"
                               variant={u.status === "active" ? "outline" : "default"}
-                              disabled={u._id === currentAdmin?.id}
+                              disabled={u._id === currentAdmin?.id || u._id === currentAdmin?._id}
                               onClick={() => toggleUserStatus(u._id, u.status)}
                               className={`h-8 px-3 text-xs font-semibold rounded-lg ${
                                 u.status === "active"
