@@ -298,3 +298,50 @@ exports.incrementDownload = async (req, res) => {
     return res.status(500).json({ message: "Lỗi tăng lượt tải", error: error.message });
   }
 };
+
+exports.getMyDocuments = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: "Chưa xác thực người dùng" });
+    }
+
+    const documents = await Document.find({ uploaderId: userId })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.json({
+      documents,
+      count: documents.length,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Lỗi lấy danh sách tài liệu của bạn",
+      error: error.message,
+    });
+  }
+};
+
+exports.deleteMyDocument = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const { id } = req.params;
+
+    const doc = await Document.findById(id);
+    if (!doc) {
+      return res.status(404).json({ message: "Tài liệu không tồn tại" });
+    }
+
+    if (doc.uploaderId?.toString() !== userId?.toString() && req.user?.role !== "admin") {
+      return res.status(403).json({ message: "Bạn không có quyền xoá tài liệu này" });
+    }
+
+    await Document.findByIdAndDelete(id);
+    return res.json({ message: "Xoá tài liệu thành công" });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Lỗi xoá tài liệu",
+      error: error.message,
+    });
+  }
+};

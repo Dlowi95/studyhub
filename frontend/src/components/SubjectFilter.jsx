@@ -6,11 +6,11 @@ export default function SubjectFilter({ subjects = [], selectedSubject = "", onS
     <div className="space-y-3.5 text-left">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg md:text-xl font-bold text-slate-900">
+          <h2 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white">
             Phân loại học phần
           </h2>
           {selectedSubject && (
-            <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-800 border-emerald-200">
+            <Badge variant="outline" className="text-xs bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
               Đang lọc: {selectedSubject}
             </Badge>
           )}
@@ -34,10 +34,10 @@ export default function SubjectFilter({ subjects = [], selectedSubject = "", onS
               key={idx}
               type="button"
               onClick={() => onSelectSubject(sub === "Tất cả" || selectedSubject === sub ? "" : sub)}
-              className={`px-3.5 py-1.5 text-xs md:text-sm rounded-xl font-medium transition-all ${
+              className={`px-3.5 py-1.5 text-xs md:text-sm rounded-xl font-medium transition-all cursor-pointer ${
                 isActive
                   ? "bg-primary text-white shadow-xs font-semibold"
-                  : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+                  : "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
               }`}
             >
               {sub}

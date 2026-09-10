@@ -94,24 +94,93 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
   };
 
   const handleGoogleLogin = () => {
-    // Placeholder / trigger for Google OAuth
-    alert("Tính năng Đăng nhập Google đang được kết nối với Google Client ID");
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      setError("Chưa cấu hình VITE_GOOGLE_CLIENT_ID trong file .env");
+      return;
+    }
+
+    if (!window.google?.accounts?.oauth2) {
+      setError("Google SDK đang tải hoặc bị chặn bởi trình duyệt. Vui lòng tải lại trang.");
+      return;
+    }
+
+    setError("");
+
+    try {
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: "email profile openid",
+        callback: async (tokenResponse) => {
+          if (tokenResponse && tokenResponse.access_token) {
+            setLoading(true);
+            setError("");
+            try {
+              // 1. Lấy thông tin user từ Google API
+              const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+              });
+              const googleUser = await userInfoRes.json();
+
+              // 2. Gửi thông tin về backend StudyHub
+              const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+              const res = await fetch(`${apiUrl}/auth/google`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  email: googleUser.email,
+                  name: googleUser.name,
+                  avatarUrl: googleUser.picture,
+                }),
+              });
+
+              const data = await res.json();
+              if (!res.ok) {
+                throw new Error(data.message || "Đăng nhập Google thất bại");
+              }
+
+              localStorage.setItem("token", data.token);
+              localStorage.setItem("user", JSON.stringify(data.user));
+              window.dispatchEvent(new Event("authChange"));
+
+              setSuccess("Đăng nhập Google thành công!");
+              setTimeout(() => {
+                onClose();
+                if (data.user?.role === "admin") {
+                  window.location.href = "/admin";
+                } else {
+                  window.location.href = "/";
+                }
+              }, 600);
+            } catch (err) {
+              setError(err.message || "Lỗi xử lý đăng nhập Google");
+            } finally {
+              setLoading(false);
+            }
+          }
+        },
+      });
+
+      client.requestAccessToken();
+    } catch (err) {
+      setError("Không thể khởi tạo đăng nhập Google: " + err.message);
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border-slate-200 shadow-xl rounded-2xl">
+      <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xl rounded-2xl">
         {/* Modal Top Header */}
-        <div className="bg-slate-50 p-6 pb-4 border-b border-slate-200/80">
+        <div className="bg-slate-50 dark:bg-slate-800/70 p-6 pb-4 border-b border-slate-200/80 dark:border-slate-800">
           {/* Tab Switcher */}
-          <div className="flex bg-slate-200/70 p-1 rounded-lg mb-4">
+          <div className="flex bg-slate-200/70 dark:bg-slate-800 p-1 rounded-lg mb-4">
             <button
               type="button"
               onClick={() => switchTab("login")}
               className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
                 tab === "login"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
               Đăng nhập
@@ -121,8 +190,8 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
               onClick={() => switchTab("register")}
               className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
                 tab === "register"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
               Đăng ký
@@ -130,10 +199,10 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
           </div>
 
           <DialogHeader className="text-left space-y-1">
-            <DialogTitle className="text-lg font-bold text-slate-900">
+            <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white">
               {tab === "login" ? "Đăng nhập" : "Đăng ký tài khoản"}
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
               {tab === "login"
                 ? "Nhập email và mật khẩu của bạn để truy cập tài khoản."
                 : "Điền thông tin bên dưới để tạo tài khoản StudyHub mới."}
@@ -148,7 +217,7 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
             type="button"
             variant="outline"
             onClick={handleGoogleLogin}
-            className="w-full h-11 border-slate-200 hover:bg-slate-50 flex items-center justify-center gap-3 font-medium text-slate-700 shadow-sm rounded-xl text-sm transition-colors"
+            className="w-full h-11 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center gap-3 font-medium text-slate-700 dark:text-slate-200 shadow-sm rounded-xl text-sm transition-colors"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -173,8 +242,8 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
 
           {/* Divider */}
           <div className="relative flex items-center justify-center">
-            <div className="border-t border-slate-200 w-full"></div>
-            <span className="bg-white px-3 text-[11px] font-semibold tracking-wider uppercase text-slate-400 absolute">
+            <div className="border-t border-slate-200 dark:border-slate-700 w-full"></div>
+            <span className="bg-white dark:bg-slate-900 px-3 text-[11px] font-semibold tracking-wider uppercase text-slate-400 dark:text-slate-500 absolute">
               hoặc email
             </span>
           </div>
@@ -188,7 +257,7 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
           )}
 
           {success && (
-            <div className="p-3 text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2">
+            <div className="p-3 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-xl flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{success}</span>
             </div>
@@ -198,7 +267,7 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {tab === "register" && (
               <div className="space-y-1.5 text-left">
-                <Label htmlFor="auth-name" className="text-xs font-semibold text-slate-700">
+                <Label htmlFor="auth-name" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Họ và tên
                 </Label>
                 <Input
@@ -208,13 +277,13 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="h-10 text-sm rounded-xl border-slate-200"
+                  className="h-10 text-sm rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                 />
               </div>
             )}
 
             <div className="space-y-1.5 text-left">
-              <Label htmlFor="auth-email" className="text-xs font-semibold text-slate-700">
+              <Label htmlFor="auth-email" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Email
               </Label>
               <Input
@@ -224,13 +293,13 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="h-10 text-sm rounded-xl border-slate-200"
+                className="h-10 text-sm rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
               />
             </div>
 
             <div className="space-y-1.5 text-left">
               <div className="flex items-center justify-between">
-                <Label htmlFor="auth-password" className="text-xs font-semibold text-slate-700">
+                <Label htmlFor="auth-password" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Mật khẩu
                 </Label>
               </div>
@@ -242,12 +311,12 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="h-10 text-sm rounded-xl border-slate-200 pr-10"
+                  className="h-10 text-sm rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white pr-10"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -272,7 +341,7 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
           </form>
 
           {/* Footer note */}
-          <div className="text-center pt-2 text-xs text-slate-500">
+          <div className="text-center pt-2 text-xs text-slate-500 dark:text-slate-400">
             {tab === "login" ? (
               <p>
                 Chưa có tài khoản?{" "}

@@ -71,23 +71,23 @@ export default function ReportModal({ isOpen, onClose, document: doc }) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[440px] p-6 rounded-2xl border-slate-200 shadow-xl">
+      <DialogContent className="sm:max-w-[440px] p-6 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xl">
         <DialogHeader className="text-left space-y-1">
-          <DialogTitle className="text-lg font-bold text-slate-900">
+          <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white">
             Báo cáo tài liệu vi phạm
           </DialogTitle>
-          <DialogDescription className="text-xs text-slate-500 line-clamp-1">
+          <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">
             Tài liệu: {doc?.title || "Không xác định"}
           </DialogDescription>
         </DialogHeader>
 
         {submitted ? (
           <div className="py-6 text-center space-y-2">
-            <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
+            <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 rounded-full flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-6 h-6" />
             </div>
-            <p className="font-semibold text-slate-900 text-sm">Đã gửi báo cáo thành công</p>
-            <p className="text-xs text-slate-500">Ban quản trị StudyHub sẽ kiểm duyệt và xử lý trong thời gian sớm nhất.</p>
+            <p className="font-semibold text-slate-900 dark:text-white text-sm">Đã gửi báo cáo thành công</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Ban quản trị StudyHub sẽ kiểm duyệt và xử lý trong thời gian sớm nhất.</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
@@ -98,12 +98,12 @@ export default function ReportModal({ isOpen, onClose, document: doc }) {
               </div>
             )}
             <div className="space-y-2 text-left">
-              <Label className="text-xs font-semibold text-slate-700">Lý do báo cáo</Label>
+              <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Lý do báo cáo</Label>
               <div className="space-y-1.5">
                 {reportReasons.map((item) => (
                   <label
                     key={item.value}
-                    className="flex items-center gap-2.5 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs text-slate-700 transition-colors"
+                    className="flex items-center gap-2.5 p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-xs text-slate-700 dark:text-slate-300 transition-colors"
                   >
                     <input
                       type="radio"
@@ -120,7 +120,7 @@ export default function ReportModal({ isOpen, onClose, document: doc }) {
             </div>
 
             <div className="space-y-1.5 text-left">
-              <Label htmlFor="report-details" className="text-xs font-semibold text-slate-700">
+              <Label htmlFor="report-details" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Mô tả chi tiết (tùy chọn)
               </Label>
               <textarea
@@ -129,12 +129,12 @@ export default function ReportModal({ isOpen, onClose, document: doc }) {
                 placeholder="Ghi rõ chi tiết lỗi hoặc trang tài liệu có vấn đề..."
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
-                className="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0 pt-2">
-              <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={loading}>
+              <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={loading} className="border-slate-200 dark:border-slate-700 dark:text-slate-300">
                 Hủy
               </Button>
               <Button type="submit" size="sm" disabled={loading} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">

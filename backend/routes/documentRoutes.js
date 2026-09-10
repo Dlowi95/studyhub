@@ -6,6 +6,8 @@ const {
   getDocuments,
   getDocumentById,
   getDocumentStats,
+  getMyDocuments,
+  deleteMyDocument,
   updateDocumentStatus,
   incrementView,
   incrementDownload,
@@ -20,12 +22,15 @@ router.post(
 );
 
 router.get("/stats", getDocumentStats);
+router.get("/my", authenticateToken, getMyDocuments);
 router.get("/", getDocuments);
 router.get("/:id", getDocumentById);
 
 // public endpoints to increment counters
 router.post("/:id/view", incrementView);
 router.post("/:id/download", incrementDownload);
+
+router.delete("/:id", authenticateToken, deleteMyDocument);
 
 router.put(
   "/:id/status",
