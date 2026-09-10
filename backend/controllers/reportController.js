@@ -68,7 +68,7 @@ exports.updateReportStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    if (!['resolved', 'dismissed'].includes(status)) {
+    if (!['pending', 'resolved', 'dismissed'].includes(status)) {
       return res.status(400).json({ message: 'Trạng thái không hợp lệ' });
     }
 
@@ -78,13 +78,28 @@ exports.updateReportStatus = async (req, res) => {
     }
 
     report.status = status;
-    report.handledBy = req.user._id;
-    report.resolvedAt = new Date();
+    report.handledBy = status === 'pending' ? null : req.user._id;
+    report.resolvedAt = status === 'pending' ? null : new Date();
     await report.save();
 
     res.json({ report });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Lỗi server khi cập nhật báo cáo' });
+  }
+};
+
+// DELETE /api/reports/:id  (chỉ admin)
+exports.deleteReport = async (req, res) => {
+  try {
+    const report = await Report.findByIdAndDelete(req.params.id);
+    if (!report) {
+      return res.status(404).json({ message: 'Không tìm thấy báo cáo' });
+    }
+
+    res.json({ message: 'Đã xóa báo cáo' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server khi xóa báo cáo' });
   }
 };

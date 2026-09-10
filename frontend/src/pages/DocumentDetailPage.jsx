@@ -26,6 +26,17 @@ import {
 
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
+const repairFileNameEncoding = (fileName) => {
+  if (typeof fileName !== "string" || !/[ÃÂâ]/.test(fileName)) return fileName;
+
+  try {
+    const bytes = Uint8Array.from(fileName, (character) => character.charCodeAt(0));
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return fileName;
+  }
+};
+
 const normalizeDocument = (doc) => ({
   id: doc._id || doc.id,
   title: doc.title || "Tài liệu chưa có tiêu đề",
@@ -38,9 +49,9 @@ const normalizeDocument = (doc) => ({
   isVerified: doc.status === "approved",
   size: doc.fileName ? `${Math.max(1, Math.round((doc.fileSize || 2) / 1024 / 1024))} MB` : "2 MB",
   fileUrl: doc.fileUrl,
-  fileName: doc.fileName,
+  fileName: repairFileNameEncoding(doc.fileName),
   description: doc.description || "",
-  status: doc.status || "approved",
+  status: doc.status || "pending",
   tags: doc.tags || [],
   createdAt: doc.createdAt,
   viewCount: doc.viewCount || 0,
@@ -305,11 +316,13 @@ export default function DocumentDetailPage() {
           </div>
 
           {/* Reviews & Ratings Section (Real Data) */}
-          <DocumentDetailReviews
-            documentId={doc.id}
-            avgRating={avgRating}
-            onAvgRatingChange={(newAvg) => setAvgRating(newAvg)}
-          />
+          {doc.status === "approved" && (
+            <DocumentDetailReviews
+              documentId={doc.id}
+              avgRating={avgRating}
+              onAvgRatingChange={(newAvg) => setAvgRating(newAvg)}
+            />
+          )}
         </div>
 
         {/* RIGHT COLUMN: STICKY SIDEBAR (1 COL) */}

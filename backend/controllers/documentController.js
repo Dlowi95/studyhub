@@ -217,7 +217,7 @@ exports.updateDocumentStatus = async (req, res) => {
 
 exports.getDocumentStats = async (req, res) => {
   try {
-    const [stats, bySubject] = await Promise.all([
+    const [stats, bySubject, monthlyUploads] = await Promise.all([
       Document.aggregate([
         {
           $group: {
@@ -242,7 +242,39 @@ exports.getDocumentStats = async (req, res) => {
         { $sort: { count: -1, views: -1 } },
         { $limit: 10 },
       ]),
+      Document.aggregate([
+        {
+          $match: {
+            createdAt: {
+              $gte: new Date(new Date().getFullYear(), new Date().getMonth() - 7, 1),
+            },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$createdAt" },
+              month: { $month: "$createdAt" },
+            },
+            uploads: { $sum: 1 },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1 } },
+      ]),
     ]);
+
+    const monthlyUploadMap = new Map(
+      monthlyUploads.map((item) => [
+        `${item._id.year}-${String(item._id.month).padStart(2, "0")}`,
+        item.uploads,
+      ])
+    );
+    const currentMonth = new Date();
+    const uploadsByMonth = Array.from({ length: 8 }, (_, index) => {
+      const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 7 + index, 1);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      return { month: key, uploads: monthlyUploadMap.get(key) || 0 };
+    });
 
     return res.json({
       summary: stats[0] || {
@@ -254,6 +286,7 @@ exports.getDocumentStats = async (req, res) => {
         totalDownloads: 0,
       },
       bySubject,
+      monthlyUploads: uploadsByMonth,
     });
   } catch (error) {
     return res.status(500).json({
@@ -344,4 +377,4 @@ exports.deleteMyDocument = async (req, res) => {
       error: error.message,
     });
   }
-};
+};

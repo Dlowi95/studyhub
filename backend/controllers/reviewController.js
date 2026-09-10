@@ -36,6 +36,9 @@ exports.createReview = async (req, res) => {
     if (!document) {
       return res.status(404).json({ message: 'Không tìm thấy tài liệu' });
     }
+    if (document.status !== 'approved') {
+      return res.status(403).json({ message: 'Tài liệu chưa được kiểm duyệt' });
+    }
 
     const review = await Review.create({
       documentId,
@@ -62,6 +65,14 @@ exports.createReview = async (req, res) => {
 exports.getReviewsByDocument = async (req, res) => {
   try {
     const { documentId } = req.params;
+
+    const document = await Document.findById(documentId);
+    if (!document) {
+      return res.status(404).json({ message: 'Không tìm thấy tài liệu' });
+    }
+    if (document.status !== 'approved') {
+      return res.status(403).json({ message: 'Tài liệu chưa được kiểm duyệt' });
+    }
 
     const reviews = await Review.find({ documentId })
       .populate('userId', 'name avatarUrl')

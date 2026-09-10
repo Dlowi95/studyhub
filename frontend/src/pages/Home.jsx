@@ -697,8 +697,12 @@ export default function Home({ onOpenAuth, user }) {
           setReportModalOpen(false);
           setActiveDocForReport(null);
         }}
-        documentId={activeDocForReport?.id}
-        documentTitle={activeDocForReport?.title}
+        document={activeDocForReport}
+        onSuccess={(reportedDocumentId) => {
+          setDocuments((previousDocuments) =>
+            previousDocuments.filter((document) => document.id !== reportedDocumentId)
+          );
+        }}
       />
 
       <UploadModal

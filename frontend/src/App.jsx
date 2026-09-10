@@ -26,7 +26,7 @@ function MainLayout() {
   const [authModalTab, setAuthModalTab] = useState("login");
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
-  const handleStorageChange = () => {
+  const handleStorageChange = async () => {
     const storedToken = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
 
@@ -40,6 +40,21 @@ function MainLayout() {
       }
     } else {
       setUser(null);
+    }
+
+    if (storedToken) {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/auth/profile`, {
+          headers: { Authorization: `Bearer ${storedToken}` },
+        });
+        if (response.ok) {
+          const profile = await response.json();
+          setUser(profile);
+          localStorage.setItem("user", JSON.stringify(profile));
+        }
+      } catch {
+        // Keep the cached user when the profile request is unavailable.
+      }
     }
   };
 
@@ -170,12 +185,21 @@ function MainLayout() {
                   className="flex items-center justify-center p-0.5 rounded-full hover:ring-2 hover:ring-primary/30 transition-all"
                 >
                   {user.avatarUrl ? (
-                    <img
-                      src={user.avatarUrl}
-                      alt={user.name || "Avatar"}
-                      referrerPolicy="no-referrer"
-                      className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-xs"
-                    />
+                    <>
+                      <img
+                        src={user.avatarUrl}
+                        alt={user.name || "Avatar"}
+                        referrerPolicy="no-referrer"
+                        onError={(event) => {
+                          event.currentTarget.style.display = "none";
+                          event.currentTarget.nextElementSibling?.classList.remove("hidden");
+                        }}
+                        className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-xs"
+                      />
+                      <div className="hidden w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 items-center justify-center text-xs font-bold uppercase shadow-xs">
+                        {user.name ? user.name.charAt(0) : "U"}
+                      </div>
+                    </>
                   ) : (
                     <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-xs font-bold uppercase shadow-xs">
                       {user.name ? user.name.charAt(0) : "U"}

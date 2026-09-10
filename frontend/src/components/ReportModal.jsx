@@ -6,7 +6,7 @@ import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
-export default function ReportModal({ isOpen, onClose, document: doc }) {
+export default function ReportModal({ isOpen, onClose, document: doc, onSuccess }) {
   const [reason, setReason] = useState("wrong_subject");
   const [details, setDetails] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -54,6 +54,7 @@ export default function ReportModal({ isOpen, onClose, document: doc }) {
         throw new Error(data.message || "Gửi báo cáo thất bại");
       }
 
+      onSuccess?.(doc.id || doc._id);
       setSubmitted(true);
       setTimeout(() => {
         setSubmitted(false);

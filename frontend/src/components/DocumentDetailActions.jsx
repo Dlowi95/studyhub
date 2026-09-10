@@ -82,12 +82,12 @@ export default function DocumentDetailActions({ doc, onDownload, onReport }) {
   return (
     <div className="space-y-3">
       {/* Primary & Secondary Action Buttons */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-stretch gap-3">
         {/* Main Download CTA */}
         <Button
           type="button"
           onClick={() => onDownload?.(doc)}
-          className="flex-1 bg-primary hover:bg-primary/90 text-white rounded-xl h-11 px-6 font-bold shadow-xs active:scale-[0.98] transition-all gap-2 text-sm"
+          className="w-full sm:flex-1 min-w-0 bg-primary hover:bg-primary/90 text-white rounded-xl h-11 px-4 font-bold shadow-xs active:scale-[0.98] transition-all gap-2 text-sm"
         >
           <Download className="w-4 h-4" />
           <span>Tải xuống tài liệu</span>
@@ -104,7 +104,7 @@ export default function DocumentDetailActions({ doc, onDownload, onReport }) {
             type="button"
             variant="outline"
             onClick={() => window.open(encodeURI(doc.fileUrl), "_blank", "noopener,noreferrer")}
-            className="rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 h-11 px-5 text-slate-700 dark:text-slate-200 font-semibold text-sm gap-2"
+            className="w-full sm:flex-1 min-w-0 rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 h-11 px-4 text-slate-700 dark:text-slate-200 font-semibold text-sm gap-2"
           >
             <FileText className="w-4 h-4 text-slate-500 dark:text-slate-400" />
             <span>Mở xem trực tiếp</span>
@@ -113,7 +113,7 @@ export default function DocumentDetailActions({ doc, onDownload, onReport }) {
       </div>
 
       {/* Utility Action Buttons */}
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex flex-wrap items-center gap-2 pt-1">
         {/* Bookmark Button */}
         <Button
           type="button"
@@ -157,7 +157,7 @@ export default function DocumentDetailActions({ doc, onDownload, onReport }) {
           variant="outline"
           size="sm"
           onClick={() => onReport?.(doc)}
-          className="rounded-xl border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:text-red-600 hover:border-red-200 dark:hover:border-red-900/60 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs font-semibold gap-1.5 h-9 ml-auto"
+          className="rounded-xl border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:text-red-600 hover:border-red-200 dark:hover:border-red-900/60 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs font-semibold gap-1.5 h-9 ml-0 sm:ml-auto"
         >
           <MessageSquareWarning className="w-3.5 h-3.5" />
           <span>Báo cáo</span>

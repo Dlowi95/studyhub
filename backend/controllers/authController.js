@@ -221,8 +221,8 @@ exports.googleLogin = async (req, res) => {
 
       await user.save();
     } else {
-      // Sync google avatar if available
-      if (avatarUrl) {
+      // Keep a previously uploaded avatar instead of replacing it on Google login.
+      if (avatarUrl && !user.avatarUrl) {
         user.avatarUrl = avatarUrl;
         await user.save();
       }
