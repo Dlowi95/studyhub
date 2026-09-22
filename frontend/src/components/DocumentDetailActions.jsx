@@ -3,7 +3,7 @@ import { Download, FileText, MessageSquareWarning, Bookmark, Share2, Check } fro
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
-export default function DocumentDetailActions({ doc, onDownload, onReport }) {
+export default function DocumentDetailActions({ doc, onDownload, onReport, hasReported = false, reportStatus = null }) {
   const { toast } = useToast();
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -151,17 +151,38 @@ export default function DocumentDetailActions({ doc, onDownload, onReport }) {
           )}
         </Button>
 
-        {/* Report Button */}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => onReport?.(doc)}
-          className="rounded-xl border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:text-red-600 hover:border-red-200 dark:hover:border-red-900/60 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs font-semibold gap-1.5 h-9 ml-0 sm:ml-auto"
-        >
-          <MessageSquareWarning className="w-3.5 h-3.5" />
-          <span>Báo cáo</span>
-        </Button>
+        {/* Report Button (Yêu cầu 1 & 5) */}
+        {hasReported ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              toast({
+                title: "Tài liệu đã được báo cáo",
+                description:
+                  reportStatus === "resolved"
+                    ? "Báo cáo của bạn về tài liệu này đã được quản trị viên xử lý."
+                    : "Bạn đã gửi báo cáo vi phạm cho tài liệu này và đang chờ ban quản trị xem xét.",
+              });
+            }}
+            className="rounded-xl border-amber-300 dark:border-amber-700/80 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-xs font-semibold gap-1.5 h-9 ml-0 sm:ml-auto shadow-2xs cursor-pointer"
+          >
+            <MessageSquareWarning className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            <span>Đã báo cáo vi phạm</span>
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onReport?.(doc)}
+            className="rounded-xl border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-red-600 hover:border-red-300 dark:hover:border-red-900/60 hover:bg-red-50/80 dark:hover:bg-red-950/30 text-xs font-semibold gap-1.5 h-9 ml-0 sm:ml-auto transition-colors"
+          >
+            <MessageSquareWarning className="w-3.5 h-3.5" />
+            <span>Báo cáo vi phạm</span>
+          </Button>
+        )}
       </div>
     </div>
   );

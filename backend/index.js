@@ -12,6 +12,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const documentRoutes = require("./routes/documentRoutes");
 const reportRoutes = require("./routes/reportRoutes");   
 const reviewRoutes = require("./routes/reviewRoutes");   
+const notificationRoutes = require("./routes/notificationRoutes");
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -36,6 +37,7 @@ app.use("/api/documents", documentRoutes);
 
 app.use("/api", reportRoutes);   
 app.use("/api", reviewRoutes);
+app.use("/api", notificationRoutes);
 
 // Base route
 app.get("/", (req, res) => {

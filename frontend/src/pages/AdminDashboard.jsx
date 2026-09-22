@@ -49,10 +49,16 @@ import {
   ResponsiveContainer,
   AreaChart,
   Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   Tooltip as ChartTooltip,
   CartesianGrid,
+  Cell,
+  PieChart,
+  Pie,
+  Legend,
 } from "recharts";
 import {
   LayoutDashboard,
@@ -75,7 +81,208 @@ import {
   Eye,
   BookOpen,
   MessageSquareWarning,
+  Menu,
+  X,
+  UserCog,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  Filter,
+  Check,
+  BarChart3,
+  AlertTriangle,
+  UserCheck,
+  UserX,
+  RotateCcw,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+// Reusable Sidebar Content Component for Desktop and Mobile Drawer
+function SidebarNav({
+  activeTab,
+  setActiveTab,
+  usersCount,
+  docsCount,
+  subjectsCount,
+  pendingDocsCount,
+  pendingReportsCount,
+  currentAdmin,
+  isModerator,
+  handleLogout,
+  onItemClick,
+}) {
+  const navItems = [
+    {
+      id: "overview",
+      label: "Tổng quan",
+      icon: LayoutDashboard,
+      badge: null,
+    },
+    {
+      id: "users",
+      label: "Quản lý người dùng",
+      icon: Users,
+      badge: usersCount,
+      badgeType: "neutral",
+    },
+    {
+      id: "documents",
+      label: "Quản lý tài liệu",
+      icon: Files,
+      badge: docsCount,
+      badgeType: "neutral",
+    },
+    {
+      id: "subjects",
+      label: "Quản lý học phần",
+      icon: GraduationCap,
+      badge: subjectsCount,
+      badgeType: "neutral",
+    },
+    {
+      id: "pending",
+      label: "Kiểm duyệt tài liệu",
+      icon: FileCheck2,
+      badge: pendingDocsCount > 0 ? pendingDocsCount : null,
+      badgeType: "warning",
+    },
+    {
+      id: "reports",
+      label: "Quản lý báo cáo",
+      icon: MessageSquareWarning,
+      badge: pendingReportsCount > 0 ? pendingReportsCount : null,
+      badgeType: "danger",
+    },
+  ];
+
+  return (
+    <div className="flex flex-col justify-between h-full select-none">
+      <div className="p-4 space-y-5">
+        {/* Brand Logo Header */}
+        <div className="flex items-center justify-between px-2 py-1">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-white font-bold text-base shadow-lg shadow-emerald-900/20 border border-emerald-500/30">
+              S
+            </div>
+            <div>
+              <div className="text-sm font-extrabold tracking-tight text-white flex items-center gap-1">
+                <span>Study</span>
+                <span className="text-emerald-400">Hub</span>
+              </div>
+              <div className="text-[10px] font-bold text-emerald-400/90 tracking-wider uppercase">
+                {isModerator ? "MODERATOR PORTAL" : "HỆ THỐNG QUẢN TRỊ"}
+              </div>
+            </div>
+          </div>
+          {onItemClick && (
+            <button
+              onClick={onItemClick}
+              className="lg:hidden p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+
+        <Separator className="bg-zinc-800/60" />
+
+        {/* Navigation Items */}
+        <nav className="space-y-1 text-xs font-medium">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  if (onItemClick) onItemClick();
+                }}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all cursor-pointer ${
+                  isActive
+                    ? "bg-emerald-500/15 text-emerald-300 font-bold border border-emerald-500/30 shadow-xs"
+                    : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon className={`w-4 h-4 ${isActive ? "text-emerald-400" : "text-zinc-400"}`} />
+                  <span>{item.label}</span>
+                </div>
+                {item.badge !== null && item.badge !== undefined && (
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                      item.badgeType === "warning"
+                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                        : item.badgeType === "danger"
+                        ? "bg-red-500/20 text-red-300 border border-red-500/30"
+                        : "text-zinc-500 font-normal"
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* Bottom User Card */}
+      <div className="p-3 border-t border-zinc-800/70 bg-[#0c0d12]">
+        <div className="flex items-center justify-between p-2 rounded-xl bg-zinc-900/80 border border-zinc-800/60">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Avatar className="w-8 h-8 rounded-lg border border-emerald-500/30 bg-emerald-950 text-emerald-200">
+              <AvatarFallback className="bg-emerald-900/60 text-emerald-200 font-bold text-xs rounded-lg">
+                {currentAdmin?.name ? currentAdmin.name.charAt(0).toUpperCase() : "A"}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-zinc-100 truncate max-w-[90px]">
+                {currentAdmin?.name || "admin"}
+              </div>
+              <div
+                className={`text-[9px] font-bold uppercase tracking-wider ${
+                  isModerator ? "text-indigo-400" : "text-emerald-400"
+                }`}
+              >
+                {isModerator ? "MODERATOR" : "SUPER ADMIN"}
+              </div>
+            </div>
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer">
+                <MoreVertical className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44 bg-[#14161f] border-zinc-800 text-zinc-200 text-xs shadow-xl">
+              <DropdownMenuLabel>Tùy chọn</DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-zinc-800" />
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link to="/">
+                  <ExternalLink className="w-3.5 h-3.5 mr-2 text-zinc-400" />
+                  <span>Xem Website</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link to="/profile">
+                  <Shield className="w-3.5 h-3.5 mr-2 text-zinc-400" />
+                  <span>Hồ sơ cá nhân</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-zinc-800" />
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-400 focus:text-red-300 focus:bg-red-950/40">
+                <LogOut className="w-3.5 h-3.5 mr-2" />
+                <span>Đăng xuất</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview"); // "overview" | "users" | "documents" | "subjects" | "pending" | "reports"
@@ -92,13 +299,36 @@ export default function AdminDashboard() {
   const [docFilterStatus, setDocFilterStatus] = useState("all");
   const [lastUpdated, setLastUpdated] = useState("");
 
-  // Reject Modal state
+  // Responsive Drawer state (Yêu cầu 4)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  // User Management filtering state (Yêu cầu 2)
+  const [userRoleFilter, setUserRoleFilter] = useState("all"); // "all" | "student" | "moderator" | "admin"
+  const [userStatusFilter, setUserStatusFilter] = useState("all"); // "all" | "active" | "blocked"
+
+  // Role Change Modal state (Yêu cầu 3)
+  const [roleModalOpen, setRoleModalOpen] = useState(false);
+  const [selectedUserForRole, setSelectedUserForRole] = useState(null);
+  const [selectedNewRole, setSelectedNewRole] = useState("student");
+  const [roleUpdating, setRoleUpdating] = useState(false);
+
+  // Reject Document Modal state
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [selectedPendingDoc, setSelectedPendingDoc] = useState(null);
   const [rejectReason, setRejectReason] = useState("Tài liệu không rõ nguồn gốc hoặc chất lượng kém");
 
+  // Report Management State
+  const [reportFilter, setReportFilter] = useState("all");
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [selectedReportForAction, setSelectedReportForAction] = useState(null);
+  const [reportActionType, setReportActionType] = useState("resolve_reject"); // "resolve_reject" | "resolve_delete" | "dismiss"
+  const [reportFeedbackText, setReportFeedbackText] = useState("");
+
+  const { toast } = useToast();
   const navigate = useNavigate();
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
+  const isModerator = currentAdmin?.role === "moderator";
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem("token");
@@ -128,7 +358,7 @@ export default function AdminDashboard() {
         setPendingDocs(docsList.filter((d) => d.status === "pending"));
       }
 
-      // 2. Fetch real users from MongoDB
+      // 2. Fetch real users from MongoDB (Admins and Moderators can view, though Moderator cannot edit)
       const userRes = await fetch(`${apiUrl}/admin/users`, { headers: getAuthHeaders() });
       if (userRes.ok) {
         const userData = await userRes.json();
@@ -180,6 +410,7 @@ export default function AdminDashboard() {
     fetchData();
   }, []);
 
+  // --- Document Approvals & Rejections ---
   const handleApproveDoc = async (docId) => {
     try {
       const res = await fetch(`${apiUrl}/admin/documents/${docId}/status`, {
@@ -189,12 +420,24 @@ export default function AdminDashboard() {
       });
       if (res.ok) {
         fetchData();
+        toast({
+          title: "Đã duyệt tài liệu",
+          description: "Tài liệu đã được phê duyệt và hiển thị công khai.",
+        });
       } else {
         const data = await res.json();
-        alert(data.message || "Lỗi khi duyệt tài liệu");
+        toast({
+          variant: "destructive",
+          title: "Lỗi duyệt tài liệu",
+          description: data.message || "Không thể duyệt tài liệu",
+        });
       }
     } catch (err) {
-      alert("Lỗi: " + err.message);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: err.message,
+      });
     }
   };
 
@@ -216,17 +459,37 @@ export default function AdminDashboard() {
       if (res.ok) {
         setRejectModalOpen(false);
         fetchData();
+        toast({
+          title: "Đã từ chối tài liệu",
+          description: "Tài liệu đã chuyển sang trạng thái bị từ chối.",
+        });
       } else {
         const data = await res.json();
-        alert(data.message || "Lỗi khi từ chối tài liệu");
+        toast({
+          variant: "destructive",
+          title: "Lỗi",
+          description: data.message || "Không thể từ chối tài liệu",
+        });
       }
     } catch (err) {
-      alert("Lỗi: " + err.message);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: err.message,
+      });
     }
   };
 
   const handleDeleteDoc = async (docId) => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa tài liệu này vĩnh viễn?")) return;
+    if (isModerator) {
+      toast({
+        variant: "destructive",
+        title: "Quyền bị giới hạn",
+        description: "Chỉ Quản trị viên (Admin) mới có quyền xóa tài liệu vĩnh viễn.",
+      });
+      return;
+    }
+    if (!window.confirm("Bạn có chắc chắn muốn xóa tài liệu này vĩnh viễn khỏi hệ thống?")) return;
     try {
       const res = await fetch(`${apiUrl}/admin/documents/${docId}`, {
         method: "DELETE",
@@ -235,13 +498,48 @@ export default function AdminDashboard() {
       if (res.ok) {
         setAllDocs((prev) => prev.filter((d) => (d._id || d.id) !== docId));
         setPendingDocs((prev) => prev.filter((d) => (d._id || d.id) !== docId));
+        toast({
+          title: "Đã xóa tài liệu",
+          description: "Tài liệu đã bị gỡ vĩnh viễn khỏi máy chủ.",
+        });
+      } else {
+        const data = await res.json();
+        toast({
+          variant: "destructive",
+          title: "Lỗi xóa tài liệu",
+          description: data.message || "Không thể xóa tài liệu",
+        });
       }
     } catch (err) {
-      alert("Lỗi: " + err.message);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: err.message,
+      });
     }
   };
 
+  // --- User Management: Toggle Status (Yêu cầu 2) ---
   const toggleUserStatus = async (userId, currentStatus) => {
+    if (isModerator) {
+      toast({
+        variant: "destructive",
+        title: "Quyền bị giới hạn",
+        description: "Chỉ Quản trị viên (Admin) mới có quyền khóa hoặc mở khóa tài khoản.",
+      });
+      return;
+    }
+
+    const currentId = currentAdmin?._id || currentAdmin?.id;
+    if (userId === currentId) {
+      toast({
+        variant: "destructive",
+        title: "Hạn chế bảo mật",
+        description: "Bạn không thể tự khóa tài khoản của chính mình.",
+      });
+      return;
+    }
+
     const newStatus = currentStatus === "active" ? "blocked" : "active";
     try {
       const res = await fetch(`${apiUrl}/admin/users/${userId}/status`, {
@@ -254,42 +552,201 @@ export default function AdminDashboard() {
         setUsers((prev) =>
           prev.map((u) => (u._id === userId ? { ...u, status: newStatus } : u))
         );
+        toast({
+          title: newStatus === "blocked" ? "Đã khóa tài khoản" : "Đã mở khóa tài khoản",
+          description: `Tài khoản đã được chuyển sang trạng thái "${newStatus === "blocked" ? "Bị khóa" : "Hoạt động"}".`,
+        });
       } else {
-        alert(data.message || "Không thể cập nhật trạng thái");
+        toast({
+          variant: "destructive",
+          title: "Không thể cập nhật",
+          description: data.message || "Không thể cập nhật trạng thái người dùng",
+        });
       }
     } catch (err) {
-      alert("Lỗi: " + err.message);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: err.message,
+      });
     }
   };
 
-  const handleReportAction = async (report, action) => {
+  // --- User Management: Role Change (Yêu cầu 3) ---
+  const handleOpenRoleModal = (user) => {
+    if (isModerator) {
+      toast({
+        variant: "destructive",
+        title: "Quyền bị giới hạn",
+        description: "Chỉ Quản trị viên (Admin) mới có quyền thay đổi vai trò người dùng.",
+      });
+      return;
+    }
+    setSelectedUserForRole(user);
+    setSelectedNewRole(user.role || "student");
+    setRoleModalOpen(true);
+  };
+
+  const handleSaveUserRole = async () => {
+    if (!selectedUserForRole) return;
+    const targetId = selectedUserForRole._id || selectedUserForRole.id;
+    const currentId = currentAdmin?._id || currentAdmin?.id;
+
+    if (targetId === currentId) {
+      toast({
+        variant: "destructive",
+        title: "Hạn chế bảo mật",
+        description: "Bạn không thể tự thay đổi vai trò của tài khoản đang đăng nhập.",
+      });
+      return;
+    }
+
+    setRoleUpdating(true);
     try {
-      const documentId = report.documentId?._id;
-      if (documentId) {
-        const documentRes = await fetch(`${apiUrl}/admin/documents/${documentId}${action === "delete" ? "" : "/status"}`, {
-          method: action === "delete" ? "DELETE" : "PATCH",
-          headers: getAuthHeaders(),
-          ...(action === "delete" ? {} : { body: JSON.stringify({ status: "rejected" }) }),
+      const res = await fetch(`${apiUrl}/admin/users/${targetId}/role`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ role: selectedNewRole }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUsers((prev) =>
+          prev.map((u) => (u._id === targetId ? { ...u, role: selectedNewRole } : u))
+        );
+        setRoleModalOpen(false);
+        const roleLabels = {
+          admin: "Quản trị viên (Admin)",
+          moderator: "Kiểm duyệt viên (Moderator)",
+          student: "Sinh viên (Student)",
+        };
+        toast({
+          title: "Cập nhật vai trò thành công",
+          description: `Người dùng "${selectedUserForRole.name || ""}" đã được phân quyền "${roleLabels[selectedNewRole]}".`,
         });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Không thể đổi vai trò",
+          description: data.message || "Lỗi cập nhật vai trò",
+        });
+      }
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Lỗi kết nối",
+        description: err.message,
+      });
+    } finally {
+      setRoleUpdating(false);
+    }
+  };
+
+  // --- Report Management Handlers ---
+  const handleOpenReportModal = (report, actionType) => {
+    setSelectedReportForAction(report);
+    setReportActionType(actionType);
+    if (actionType === "resolve_reject") {
+      setReportFeedbackText("Tài liệu đã bị từ chối phê duyệt do vi phạm quy định cộng đồng StudyHub.");
+    } else if (actionType === "resolve_delete") {
+      setReportFeedbackText("Tài liệu vi phạm nghiêm trọng và đã bị xóa hoàn toàn khỏi hệ thống.");
+    } else if (actionType === "dismiss") {
+      setReportFeedbackText("Tài liệu đã được kiểm duyệt lại và không vi phạm chính sách của StudyHub.");
+    }
+    setReportModalOpen(true);
+  };
+
+  const handleConfirmReportModal = async () => {
+    if (!selectedReportForAction) return;
+    const report = selectedReportForAction;
+    const action = reportActionType;
+
+    try {
+      const documentId = report.documentId?._id || report.documentId;
+      if (documentId && (action === "resolve_reject" || action === "resolve_delete")) {
+        const documentRes = await fetch(
+          `${apiUrl}/admin/documents/${documentId}${action === "resolve_delete" ? "" : "/status"}`,
+          {
+            method: action === "resolve_delete" ? "DELETE" : "PATCH",
+            headers: getAuthHeaders(),
+            ...(action === "resolve_delete" ? {} : { body: JSON.stringify({ status: "rejected" }) }),
+          }
+        );
         if (!documentRes.ok && documentRes.status !== 404) {
           const data = await documentRes.json();
           throw new Error(data.message || "Không thể cập nhật tài liệu");
         }
       }
 
+      const reportStatus = action === "dismiss" ? "dismissed" : "resolved";
       const reportRes = await fetch(`${apiUrl}/reports/${report._id}/status`, {
         method: "PUT",
         headers: getAuthHeaders(),
-        body: JSON.stringify({ status: "resolved" }),
+        body: JSON.stringify({
+          status: reportStatus,
+          adminFeedback: reportFeedbackText.trim(),
+        }),
       });
+
       if (reportRes.ok) {
+        setReportModalOpen(false);
+        setSelectedReportForAction(null);
         fetchData();
+        toast({
+          title: "Xử lý báo cáo thành công",
+          description: "Đã cập nhật trạng thái báo cáo và gửi thông báo phản hồi tới sinh viên.",
+        });
       } else {
         const data = await reportRes.json();
-        alert(data.message || "Không thể cập nhật báo cáo");
+        toast({
+          variant: "destructive",
+          title: "Lỗi",
+          description: data.message || "Không thể cập nhật báo cáo",
+        });
       }
     } catch (err) {
-      alert("Lỗi: " + err.message);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: err.message,
+      });
+    }
+  };
+
+  const handleDeleteReport = async (reportId) => {
+    if (isModerator) {
+      toast({
+        variant: "destructive",
+        title: "Quyền bị giới hạn",
+        description: "Chỉ Quản trị viên (Admin) mới có quyền xóa dữ liệu nhật ký báo cáo.",
+      });
+      return;
+    }
+    if (!window.confirm("Bạn có chắc chắn muốn xóa bản ghi báo cáo này?")) return;
+    try {
+      const res = await fetch(`${apiUrl}/reports/${reportId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        setReports((prev) => prev.filter((r) => r._id !== reportId));
+        toast({
+          title: "Đã xóa báo cáo",
+          description: "Bản ghi báo cáo đã được gỡ bỏ khỏi hệ thống.",
+        });
+      } else {
+        const data = await res.json();
+        toast({
+          variant: "destructive",
+          title: "Lỗi",
+          description: data.message || "Không thể xóa báo cáo",
+        });
+      }
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: err.message,
+      });
     }
   };
 
@@ -317,8 +774,16 @@ export default function AdminDashboard() {
         throw new Error(data.message || "Không thể mở lại báo cáo");
       }
       fetchData();
+      toast({
+        title: "Đã mở lại báo cáo",
+        description: "Báo cáo và tài liệu đã được chuyển lại về trạng thái chờ xử lý.",
+      });
     } catch (err) {
-      alert("Lỗi: " + err.message);
+      toast({
+        variant: "destructive",
+        title: "Lỗi",
+        description: err.message,
+      });
     }
   };
 
@@ -334,14 +799,17 @@ export default function AdminDashboard() {
     documents: "Quản lý tài liệu",
     subjects: "Quản lý học phần",
     pending: "Kiểm duyệt tài liệu",
-    reports: "Quản lý báo cáo",
+    reports: "Quản lý báo cáo vi phạm",
   };
 
+  // --- Statistics & Chart Computations (Yêu cầu 1) ---
   const approvedDocsCount = documentStats?.summary?.approved ?? allDocs.filter((d) => d.status === "approved").length;
+  const rejectedDocsCount = allDocs.filter((d) => d.status === "rejected").length;
   const recentUsersCount = users.filter((user) => {
     const createdAt = new Date(user.createdAt).getTime();
     return createdAt >= Date.now() - 30 * 24 * 60 * 60 * 1000;
   }).length;
+
   const activityChartData = (documentStats?.monthlyUploads || []).map((item) => ({
     month: new Date(`${item.month}-01T00:00:00`).toLocaleDateString("vi-VN", {
       month: "short",
@@ -349,6 +817,34 @@ export default function AdminDashboard() {
     }),
     uploads: item.uploads,
   }));
+
+  // Document Status Distribution for BarChart
+  const docStatusChartData = [
+    { name: "Đã duyệt", count: approvedDocsCount, fill: "#10b981" },
+    { name: "Chờ duyệt", count: pendingDocs.length, fill: "#f59e0b" },
+    { name: "Bị từ chối", count: rejectedDocsCount, fill: "#ef4444" },
+    { name: "Báo cáo", count: reports.filter((r) => r.status === "pending").length, fill: "#ec4899" },
+  ];
+
+  // User Role Breakdown
+  const studentUsersCount = users.filter((u) => !u.role || u.role === "student").length;
+  const moderatorUsersCount = users.filter((u) => u.role === "moderator").length;
+  const adminUsersCount = users.filter((u) => u.role === "admin").length;
+  const blockedUsersCount = users.filter((u) => u.status === "blocked").length;
+
+  const userRoleChartData = [
+    { name: "Sinh viên", value: studentUsersCount, color: "#3b82f6" },
+    { name: "Kiểm duyệt", value: moderatorUsersCount, color: "#8b5cf6" },
+    { name: "Quản trị", value: adminUsersCount, color: "#10b981" },
+  ];
+
+  // Reports KPIs
+  const pendingReportsCount = reports.filter((report) => report.status === "pending").length;
+  const resolvedReportsCount = reports.filter((report) => report.status === "resolved").length;
+  const dismissedReportsCount = reports.filter((report) => report.status === "dismissed").length;
+  const reportResolutionRate = reports.length > 0 ? Math.round((resolvedReportsCount / reports.length) * 100) : 100;
+
+  // File format breakdown
   const fileFormatCounts = allDocs.reduce((counts, doc) => {
     const fileType = (doc.fileType || "OTHER").toString().split("/").pop().toUpperCase();
     const normalizedType = fileType === "MPEG" ? "MP4" : fileType;
@@ -362,207 +858,107 @@ export default function AdminDashboard() {
       type,
       percentage: allDocs.length ? Math.round((count / allDocs.length) * 100) : 0,
     }));
-  const pendingReportsCount = reports.filter((report) => report.status === "pending").length;
 
   return (
     <div className="dark min-h-screen bg-[#090a0f] text-zinc-100 flex font-sans antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
-      {/* 1. LEFT SIDEBAR (Dark Theme Cố định) */}
-      <aside className="w-64 bg-[#0f1015] border-r border-zinc-800/70 flex flex-col justify-between shrink-0 sticky top-0 h-screen select-none z-40">
-        <div className="p-4 space-y-5">
-          {/* Brand Logo Header */}
-          <div className="flex items-center gap-3 px-2 py-1">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-white font-bold text-base shadow-lg shadow-emerald-900/20 border border-emerald-500/30">
-              S
-            </div>
-            <div>
-              <div className="text-sm font-extrabold tracking-tight text-white flex items-center gap-1">
-                <span>Study</span>
-                <span className="text-emerald-400">Hub</span>
-              </div>
-              <div className="text-[10px] font-bold text-emerald-400/90 tracking-wider uppercase">
-                HỆ THỐNG QUẢN TRỊ
-              </div>
-            </div>
-          </div>
-
-          <Separator className="bg-zinc-800/60" />
-
-          {/* Navigation Items (Đúng 5 mục) */}
-          <nav className="space-y-1 text-xs font-medium">
-            {/* 1. Tổng quan */}
-            <button
-              onClick={() => setActiveTab("overview")}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all ${
-                activeTab === "overview"
-                  ? "bg-emerald-500/15 text-emerald-300 font-bold border border-emerald-500/30 shadow-xs"
-                  : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <LayoutDashboard className={`w-4 h-4 ${activeTab === "overview" ? "text-emerald-400" : "text-zinc-400"}`} />
-                <span>Tổng quan</span>
-              </div>
-            </button>
-
-            {/* 2. Quản lý người dùng */}
-            <button
-              onClick={() => setActiveTab("users")}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all ${
-                activeTab === "users"
-                  ? "bg-emerald-500/15 text-emerald-300 font-bold border border-emerald-500/30 shadow-xs"
-                  : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Users className={`w-4 h-4 ${activeTab === "users" ? "text-emerald-400" : "text-zinc-400"}`} />
-                <span>Quản lý người dùng</span>
-              </div>
-              <span className="text-[10px] text-zinc-500 font-mono">{users.length}</span>
-            </button>
-
-            {/* 3. Quản lý tài liệu */}
-            <button
-              onClick={() => setActiveTab("documents")}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all ${
-                activeTab === "documents"
-                  ? "bg-emerald-500/15 text-emerald-300 font-bold border border-emerald-500/30 shadow-xs"
-                  : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Files className={`w-4 h-4 ${activeTab === "documents" ? "text-emerald-400" : "text-zinc-400"}`} />
-                <span>Quản lý tài liệu</span>
-              </div>
-              <span className="text-[10px] text-zinc-500 font-mono">{allDocs.length}</span>
-            </button>
-
-            {/* 4. Quản lý học phần */}
-            <button
-              onClick={() => setActiveTab("subjects")}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all ${
-                activeTab === "subjects"
-                  ? "bg-emerald-500/15 text-emerald-300 font-bold border border-emerald-500/30 shadow-xs"
-                  : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <GraduationCap className={`w-4 h-4 ${activeTab === "subjects" ? "text-emerald-400" : "text-zinc-400"}`} />
-                <span>Quản lý học phần</span>
-              </div>
-              <span className="text-[10px] text-zinc-500 font-mono">{subjects.length}</span>
-            </button>
-
-            {/* 5. Kiểm duyệt tài liệu */}
-            <button
-              onClick={() => setActiveTab("pending")}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all ${
-                activeTab === "pending"
-                  ? "bg-emerald-500/15 text-emerald-300 font-bold border border-emerald-500/30 shadow-xs"
-                  : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <FileCheck2 className={`w-4 h-4 ${activeTab === "pending" ? "text-emerald-400" : "text-zinc-400"}`} />
-                <span>Kiểm duyệt tài liệu</span>
-              </div>
-              {pendingDocs.length > 0 && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  {pendingDocs.length}
-                </span>
-              )}
-            </button>
-
-            {/* 6. Quản lý báo cáo */}
-            <button
-              onClick={() => setActiveTab("reports")}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all ${
-                activeTab === "reports"
-                  ? "bg-emerald-500/15 text-emerald-300 font-bold border border-emerald-500/30 shadow-xs"
-                  : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <MessageSquareWarning className={`w-4 h-4 ${activeTab === "reports" ? "text-emerald-400" : "text-zinc-400"}`} />
-                <span>Quản lý báo cáo</span>
-              </div>
-              {pendingReportsCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">
-                  {pendingReportsCount}
-                </span>
-              )}
-            </button>
-          </nav>
-        </div>
-
-        {/* Bottom Profile Box */}
-        <div className="p-3 border-t border-zinc-800/70 bg-[#0c0d12]">
-          <div className="flex items-center justify-between p-2 rounded-xl bg-zinc-900/80 border border-zinc-800/60">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <Avatar className="w-8 h-8 rounded-lg border border-emerald-500/30 bg-emerald-950 text-emerald-200">
-                <AvatarFallback className="bg-emerald-900/60 text-emerald-200 font-bold text-xs rounded-lg">
-                  {currentAdmin?.name ? currentAdmin.name.charAt(0).toUpperCase() : "A"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-zinc-100 truncate max-w-[85px]">
-                  {currentAdmin?.name || "admin"}
-                </div>
-                <div className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">
-                  SUPER ADMIN
-                </div>
-              </div>
-            </div>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors">
-                  <MoreVertical className="w-4 h-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44 bg-[#14161f] border-zinc-800 text-zinc-200 text-xs shadow-xl">
-                <DropdownMenuLabel>Tùy chọn</DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-zinc-800" />
-                <DropdownMenuItem asChild className="cursor-pointer">
-                  <Link to="/">
-                    <ExternalLink className="w-3.5 h-3.5 mr-2 text-zinc-400" />
-                    <span>Xem Website</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-400 focus:text-red-300 focus:bg-red-950/40">
-                  <LogOut className="w-3.5 h-3.5 mr-2" />
-                  <span>Đăng xuất</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
+      {/* 1. LEFT SIDEBAR (Desktop Fixed) */}
+      <aside className="hidden lg:flex w-64 bg-[#0f1015] border-r border-zinc-800/70 flex-col shrink-0 sticky top-0 h-screen z-40">
+        <SidebarNav
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          usersCount={users.length}
+          docsCount={allDocs.length}
+          subjectsCount={subjects.length}
+          pendingDocsCount={pendingDocs.length}
+          pendingReportsCount={pendingReportsCount}
+          currentAdmin={currentAdmin}
+          isModerator={isModerator}
+          handleLogout={handleLogout}
+        />
       </aside>
+
+      {/* 1.1 MOBILE DRAWER SIDEBAR (Yêu cầu 4) */}
+      {mobileSidebarOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div
+            className="fixed inset-0 bg-black/75 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+          <aside className="relative w-72 max-w-[85vw] bg-[#0f1015] border-r border-zinc-800/70 flex flex-col h-full z-50 shadow-2xl animate-in slide-in-from-left duration-200">
+            <SidebarNav
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              usersCount={users.length}
+              docsCount={allDocs.length}
+              subjectsCount={subjects.length}
+              pendingDocsCount={pendingDocs.length}
+              pendingReportsCount={pendingReportsCount}
+              currentAdmin={currentAdmin}
+              isModerator={isModerator}
+              handleLogout={handleLogout}
+              onItemClick={() => setMobileSidebarOpen(false)}
+            />
+          </aside>
+        </div>
+      )}
 
       {/* 2. MAIN VIEWPORT */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         {/* Top Navbar */}
-        <header className="h-14 px-6 bg-[#0f1015]/80 backdrop-blur-md border-b border-zinc-800/70 flex items-center justify-between sticky top-0 z-30 shadow-xs">
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-2 text-xs font-medium">
-            <span className="text-zinc-500">Admin</span>
-            <span className="text-zinc-700">/</span>
-            <span className="text-zinc-100 font-bold text-sm">{tabTitles[activeTab]}</span>
+        <header className="h-14 px-4 sm:px-6 bg-[#0f1015]/80 backdrop-blur-md border-b border-zinc-800/70 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+          {/* Breadcrumb & Mobile Menu Toggle */}
+          <div className="flex items-center gap-3 text-xs font-medium min-w-0">
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="lg:hidden p-2 -ml-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800/60 transition-colors cursor-pointer"
+              title="Mở menu quản trị"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 truncate">
+              <span className="text-zinc-500 hidden sm:inline">Admin</span>
+              <span className="text-zinc-700 hidden sm:inline">/</span>
+              <span className="text-zinc-100 font-bold text-sm truncate">{tabTitles[activeTab]}</span>
+            </div>
+
+            {/* Role indicator pill badge */}
+            <Badge
+              variant="outline"
+              className={`hidden sm:inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                isModerator
+                  ? "bg-indigo-500/10 text-indigo-300 border-indigo-500/30"
+                  : "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
+              }`}
+            >
+              <ShieldCheck className="w-3 h-3 mr-1" />
+              {isModerator ? "Moderator" : "Super Admin"}
+            </Badge>
           </div>
 
           {/* Right Controls */}
-          <div className="flex items-center gap-3 text-xs">
-            <div className="hidden sm:flex items-center gap-2 text-zinc-400 bg-zinc-900/80 px-3 py-1.5 rounded-lg border border-zinc-800/80">
+          <div className="flex items-center gap-2 sm:gap-3 text-xs">
+            <div className="hidden md:flex items-center gap-2 text-zinc-400 bg-zinc-900/80 px-3 py-1.5 rounded-lg border border-zinc-800/80">
               <Clock className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Cập nhật lúc {lastUpdated || "21:11"}</span>
+              <span>Cập nhật {lastUpdated || "gần đây"}</span>
               <button
                 onClick={fetchData}
                 disabled={loading}
                 title="Làm mới dữ liệu"
-                className="ml-1 text-zinc-400 hover:text-emerald-400 transition-colors"
+                className="ml-1 text-zinc-400 hover:text-emerald-400 transition-colors cursor-pointer"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-emerald-400" : ""}`} />
               </button>
             </div>
+
+            <button
+              onClick={fetchData}
+              disabled={loading}
+              title="Làm mới"
+              className="md:hidden p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-emerald-400" : ""}`} />
+            </button>
 
             <Link to="/">
               <Button
@@ -570,19 +966,19 @@ export default function AdminDashboard() {
                 size="sm"
                 className="h-8 bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-300 text-xs font-semibold rounded-xl"
               >
-                <ExternalLink className="w-3.5 h-3.5 mr-1.5 text-emerald-400" />
-                <span>Xem Website</span>
+                <ExternalLink className="w-3.5 h-3.5 sm:mr-1.5 text-emerald-400" />
+                <span className="hidden sm:inline">Xem Website</span>
               </Button>
             </Link>
           </div>
         </header>
 
-        {/* Dashboard Content */}
-        <main className="p-6 space-y-6 flex-1 text-left">
-          {/* ================= TAB 1: OVERVIEW ================= */}
+        {/* Dashboard Main Content */}
+        <main className="p-4 sm:p-6 space-y-6 flex-1 text-left">
+          {/* ================= TAB 1: OVERVIEW (Yêu cầu 1: Biểu đồ & Thống kê) ================= */}
           {activeTab === "overview" && (
             <div className="space-y-6">
-              {/* 4 Stat Cards Row */}
+              {/* 4 Primary Stat Cards Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Stat 1: Người dùng */}
                 <Card className="bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs">
@@ -596,7 +992,7 @@ export default function AdminDashboard() {
                     <div className="text-3xl font-extrabold text-white tracking-tight">{users.length}</div>
                     <div className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
                       <TrendingUp className="w-3 h-3" />
-                      <span>+{recentUsersCount} người dùng trong 30 ngày qua</span>
+                      <span>+{recentUsersCount} thành viên trong 30 ngày</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -613,7 +1009,7 @@ export default function AdminDashboard() {
                     <div className="text-3xl font-extrabold text-white tracking-tight">{approvedDocsCount}</div>
                     <div className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
                       <TrendingUp className="w-3 h-3" />
-                      <span>{documentStats?.summary?.totalDownloads || 0} lượt tải</span>
+                      <span>{documentStats?.summary?.totalDownloads || 0} lượt tải tổng cộng</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -622,62 +1018,61 @@ export default function AdminDashboard() {
                 <Card className="bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs">
                   <CardContent className="p-5 space-y-2.5">
                     <div className="flex items-center justify-between text-[11px] font-bold tracking-wider text-zinc-400 uppercase">
-                      <span>VIỆC CHỜ XỬ LÝ</span>
+                      <span>HÀNG ĐỢI KIỂM DUYỆT</span>
                       <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
                         <Clock className="w-3.5 h-3.5" />
                       </div>
                     </div>
                     <div className="text-3xl font-extrabold text-white tracking-tight">{pendingDocs.length}</div>
                     <div className="text-[11px] font-semibold text-amber-400">
-                      <span>{pendingDocs.length > 0 ? "Cần duyệt nội dung mới" : "Không còn việc tồn đọng"}</span>
+                      <span>{pendingDocs.length > 0 ? "Cần xét duyệt nội dung mới" : "Không có tồn đọng"}</span>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Stat 4: Học phần / Môn học */}
+                {/* Stat 4: Báo cáo vi phạm */}
                 <Card className="bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs">
                   <CardContent className="p-5 space-y-2.5">
                     <div className="flex items-center justify-between text-[11px] font-bold tracking-wider text-zinc-400 uppercase">
-                      <span>HỌC PHẦN ĐÀO TẠO</span>
-                      <div className="w-7 h-7 rounded-lg bg-teal-500/10 text-teal-400 flex items-center justify-center">
-                        <BookOpen className="w-3.5 h-3.5" />
+                      <span>BÁO CÁO CHỜ XỬ LÝ</span>
+                      <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center">
+                        <MessageSquareWarning className="w-3.5 h-3.5" />
                       </div>
                     </div>
-                    <div className="text-3xl font-extrabold text-white tracking-tight">{subjects.length}</div>
-                    <div className="text-[11px] font-semibold text-teal-400">
-                      <span>Đa dạng chuyên ngành</span>
+                    <div className="text-3xl font-extrabold text-white tracking-tight">{pendingReportsCount}</div>
+                    <div className="text-[11px] font-semibold text-rose-400">
+                      <span>{pendingReportsCount > 0 ? "Phản ánh từ sinh viên" : "Cộng đồng an toàn"}</span>
                     </div>
                   </CardContent>
                 </Card>
               </div>
 
-              {/* Middle Section: Chart & Top Học phần quan tâm */}
+              {/* Row 1: AreaChart (Uploads theo tháng) & BarChart (Phân bố trạng thái tài liệu) */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Chart Box (2 cols) */}
+                {/* AreaChart: 2 cols */}
                 <Card className="lg:col-span-2 bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs">
                   <CardHeader className="pb-2 border-b border-zinc-800/60 flex flex-row items-center justify-between">
                     <div>
-                      <CardTitle className="text-sm font-bold text-white">Tài liệu upload theo tháng</CardTitle>
-                      <CardDescription className="text-xs text-zinc-400">Số tài liệu được đăng trong 8 tháng gần nhất</CardDescription>
+                      <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-emerald-400" />
+                        <span>Tài liệu upload theo thời gian</span>
+                      </CardTitle>
+                      <CardDescription className="text-xs text-zinc-400">
+                        Biểu đồ xu hướng tài liệu được chia sẻ trong các tháng gần nhất
+                      </CardDescription>
                     </div>
-                    <div className="flex items-center gap-4 text-xs font-semibold">
-                      <span className="flex items-center gap-1.5 text-emerald-400">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Upload tài liệu
-                      </span>
-                    </div>
+                    <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                      {allDocs.length} tài liệu
+                    </span>
                   </CardHeader>
                   <CardContent className="pt-4">
-                    <div className="h-[230px] w-full">
+                    <div className="h-[240px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={activityChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                           <defs>
-                            <linearGradient id="colorDownloads" x1="0" y1="0" x2="0" y2="1">
+                            <linearGradient id="colorUploadsEmerald" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
                               <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
-                            </linearGradient>
-                            <linearGradient id="colorUploads" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
@@ -692,58 +1087,218 @@ export default function AdminDashboard() {
                               color: "#fff",
                             }}
                           />
-                          <Area type="monotone" dataKey="uploads" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorDownloads)" />
+                          <Area
+                            type="monotone"
+                            dataKey="uploads"
+                            name="Số tài liệu"
+                            stroke="#10b981"
+                            strokeWidth={2.5}
+                            fillOpacity={1}
+                            fill="url(#colorUploadsEmerald)"
+                          />
                         </AreaChart>
                       </ResponsiveContainer>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Top Học phần quan tâm & Tỷ lệ định dạng */}
+                {/* BarChart: 1 col - Phân bố trạng thái tài liệu */}
                 <Card className="bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs flex flex-col justify-between">
                   <CardHeader className="pb-2 border-b border-zinc-800/60 flex flex-row items-center justify-between">
                     <div>
+                      <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4 text-emerald-400" />
+                        <span>Trạng thái kiểm duyệt</span>
+                      </CardTitle>
+                      <CardDescription className="text-xs text-zinc-400">
+                        Phân bố tài liệu & phản ánh
+                      </CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <div className="h-[180px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={docStatusChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                          <XAxis dataKey="name" stroke="#71717a" fontSize={10} tickLine={false} />
+                          <YAxis stroke="#71717a" fontSize={10} tickLine={false} allowDecimals={false} />
+                          <ChartTooltip
+                            contentStyle={{
+                              backgroundColor: "#18181b",
+                              borderColor: "#3f3f46",
+                              borderRadius: "0.75rem",
+                              fontSize: "11px",
+                              color: "#fff",
+                            }}
+                          />
+                          <Bar dataKey="count" name="Số lượng" radius={[6, 6, 0, 0]}>
+                            {docStatusChartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.fill} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-3 border-t border-zinc-800/60 text-xs">
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/60">
+                        <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" /> Đã duyệt
+                        </span>
+                        <span className="font-bold text-zinc-200">{approvedDocsCount}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/60">
+                        <span className="text-amber-400 font-semibold flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-amber-500" /> Chờ duyệt
+                        </span>
+                        <span className="font-bold text-zinc-200">{pendingDocs.length}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Row 2: Thống kê cơ cấu người dùng & Báo cáo cộng đồng */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* 1. Cơ cấu người dùng theo vai trò */}
+                <Card className="bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs">
+                  <CardHeader className="pb-3 border-b border-zinc-800/60">
+                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                      <Users className="w-4 h-4 text-blue-400" />
+                      <span>Cơ cấu người dùng</span>
+                    </CardTitle>
+                    <CardDescription className="text-xs text-zinc-400">
+                      Tổng {users.length} tài khoản trong cơ sở dữ liệu
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-4 space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-300 flex items-center gap-2">
+                          <GraduationCap className="w-3.5 h-3.5 text-blue-400" />
+                          Sinh viên
+                        </span>
+                        <span className="font-bold text-white font-mono">{studentUsersCount} ({users.length ? Math.round((studentUsersCount / users.length) * 100) : 0}%)</span>
+                      </div>
+                      <Progress value={users.length ? (studentUsersCount / users.length) * 100 : 0} className="h-1.5 bg-zinc-800 [&>div]:bg-blue-500" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-300 flex items-center gap-2">
+                          <Shield className="w-3.5 h-3.5 text-indigo-400" />
+                          Kiểm duyệt viên (Moderator)
+                        </span>
+                        <span className="font-bold text-white font-mono">{moderatorUsersCount}</span>
+                      </div>
+                      <Progress value={users.length ? (moderatorUsersCount / users.length) * 100 : 0} className="h-1.5 bg-zinc-800 [&>div]:bg-indigo-500" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-300 flex items-center gap-2">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                          Quản trị viên (Admin)
+                        </span>
+                        <span className="font-bold text-white font-mono">{adminUsersCount}</span>
+                      </div>
+                      <Progress value={users.length ? (adminUsersCount / users.length) * 100 : 0} className="h-1.5 bg-zinc-800 [&>div]:bg-emerald-500" />
+                    </div>
+
+                    {blockedUsersCount > 0 && (
+                      <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-between text-xs text-red-400">
+                        <span className="flex items-center gap-1.5">
+                          <Lock className="w-3 h-3" />
+                          Tài khoản bị khóa
+                        </span>
+                        <span className="font-bold font-mono">{blockedUsersCount}</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* 2. Hiệu suất xử lý báo cáo vi phạm */}
+                <Card className="bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs">
+                  <CardHeader className="pb-3 border-b border-zinc-800/60">
+                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                      <MessageSquareWarning className="w-4 h-4 text-rose-400" />
+                      <span>An toàn nội dung & Báo cáo</span>
+                    </CardTitle>
+                    <CardDescription className="text-xs text-zinc-400">
+                      Tỷ lệ xử lý các phản ánh vi phạm
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-4 space-y-4">
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-900/80 border border-zinc-800">
+                      <div>
+                        <div className="text-2xl font-extrabold text-white">{reportResolutionRate}%</div>
+                        <div className="text-[11px] text-zinc-400">Tỷ lệ giải quyết vi phạm</div>
+                      </div>
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">
+                        <CheckCircle className="w-5 h-5" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800/80">
+                        <div className="text-[10px] text-zinc-400">Tổng nhận</div>
+                        <div className="text-sm font-bold text-white">{reports.length}</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800/80">
+                        <div className="text-[10px] text-emerald-400">Đã xử lý</div>
+                        <div className="text-sm font-bold text-emerald-300">{resolvedReportsCount}</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800/80">
+                        <div className="text-[10px] text-amber-400">Chờ duyệt</div>
+                        <div className="text-sm font-bold text-amber-300">{pendingReportsCount}</div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setActiveTab("reports")}
+                      className="w-full py-2 text-center text-xs font-semibold text-emerald-400 hover:text-emerald-300 hover:underline cursor-pointer"
+                    >
+                      Mở bảng quản lý báo cáo chi tiết →
+                    </button>
+                  </CardContent>
+                </Card>
+
+                {/* 3. Top Học phần quan tâm & Định dạng file */}
+                <Card className="bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs flex flex-col justify-between">
+                  <CardHeader className="pb-3 border-b border-zinc-800/60 flex flex-row items-center justify-between">
+                    <div>
                       <CardTitle className="text-sm font-bold text-white">Học phần nổi bật</CardTitle>
-                      <CardDescription className="text-xs text-zinc-400">Môn học có nhiều tài liệu & lượt tìm kiếm</CardDescription>
+                      <CardDescription className="text-xs text-zinc-400">Môn học có nhiều tài liệu nhất</CardDescription>
                     </div>
                     <button
                       onClick={() => setActiveTab("subjects")}
-                      className="text-xs font-semibold text-emerald-400 hover:underline"
+                      className="text-xs font-semibold text-emerald-400 hover:underline cursor-pointer"
                     >
                       Xem tất cả
                     </button>
                   </CardHeader>
-                  <CardContent className="pt-3 space-y-3">
-                    {subjects.length === 0 ? (
-                      <p className="py-4 text-xs text-zinc-500">Chưa có dữ liệu học phần.</p>
-                    ) : subjects.slice(0, 4).map((sub) => (
+                  <CardContent className="pt-3 space-y-2.5">
+                    {subjects.slice(0, 3).map((sub) => (
                       <div key={sub.id} className="space-y-1 text-xs">
                         <div className="flex items-center justify-between">
-                          <span className="font-medium text-zinc-200 truncate max-w-[170px]">
-                            {sub.name}
-                          </span>
-                          <span className="font-bold text-emerald-400 text-[11px]">
-                            {sub.count} tài liệu
-                          </span>
+                          <span className="font-medium text-zinc-200 truncate max-w-[160px]">{sub.name}</span>
+                          <span className="font-bold text-emerald-400 text-[11px]">{sub.count} tài liệu</span>
                         </div>
-                        <Progress value={sub.percentage || 50} className="h-1.5 bg-zinc-800" />
+                        <Progress value={sub.percentage || 50} className="h-1 bg-zinc-800 [&>div]:bg-emerald-500" />
                       </div>
                     ))}
 
                     <Separator className="bg-zinc-800/60 my-2" />
 
-                    {/* Phân loại định dạng tài liệu */}
-                    <div className="pt-1">
+                    <div>
                       <div className="flex items-center justify-between text-[11px] font-semibold text-zinc-400 pb-1.5">
                         <span>Định dạng file lưu trữ</span>
-                        <span className="text-emerald-400 font-bold">{allDocs.length} tài liệu</span>
+                        <span className="text-emerald-400 font-bold">{allDocs.length} file</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        {fileFormatStats.length === 0 ? (
-                          <p className="text-xs text-zinc-500">Chưa có dữ liệu định dạng.</p>
-                        ) : fileFormatStats.map((format) => (
-                          <div key={format.type} className="flex-1 p-2 rounded-lg bg-zinc-900 border border-zinc-800/80 text-center">
-                            <div className="text-[10px] text-zinc-500 font-bold uppercase">{format.type}</div>
+                        {fileFormatStats.map((format) => (
+                          <div key={format.type} className="flex-1 p-1.5 rounded-lg bg-zinc-900 border border-zinc-800/80 text-center">
+                            <div className="text-[9px] text-zinc-500 font-bold uppercase">{format.type}</div>
                             <div className="font-bold text-xs text-zinc-200">{format.percentage}%</div>
                           </div>
                         ))}
@@ -753,28 +1308,34 @@ export default function AdminDashboard() {
                 </Card>
               </div>
 
-              {/* Bottom Quick Pending Queue */}
+              {/* Bottom Quick Pending Queue Table */}
               <Card className="bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs">
                 <CardHeader className="pb-3 border-b border-zinc-800/60 flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle className="text-sm font-bold text-white">Hàng chờ quản trị cần xử lý</CardTitle>
-                    <CardDescription className="text-xs text-zinc-400">Danh sách tài liệu mới gửi lên chờ xem xét</CardDescription>
+                    <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                      <FileCheck2 className="w-4 h-4 text-amber-400" />
+                      <span>Hàng chờ kiểm duyệt cần xử lý ({pendingDocs.length})</span>
+                    </CardTitle>
+                    <CardDescription className="text-xs text-zinc-400">
+                      Tài liệu mới gửi lên chờ phê duyệt để hiển thị cho cộng đồng
+                    </CardDescription>
                   </div>
                   <button
                     onClick={() => setActiveTab("pending")}
-                    className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
+                    className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
                   >
                     Xem tất cả ({pendingDocs.length}) →
                   </button>
                 </CardHeader>
                 <CardContent className="p-0">
                   {pendingDocs.length === 0 ? (
-                    <div className="text-center py-10 text-zinc-500 text-xs space-y-1">
+                    <div className="text-center py-8 text-zinc-500 text-xs space-y-1">
                       <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto opacity-80" />
                       <p className="font-semibold text-zinc-300">Không có tài liệu nào chờ duyệt.</p>
+                      <p className="text-[11px] text-zinc-500">Tất cả tài liệu gửi lên đã được xem xét xong.</p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto min-w-full">
                       <Table>
                         <TableHeader className="bg-zinc-900/60 text-xs">
                           <TableRow className="border-zinc-800">
@@ -785,7 +1346,7 @@ export default function AdminDashboard() {
                           </TableRow>
                         </TableHeader>
                         <TableBody className="text-xs">
-                          {pendingDocs.slice(0, 3).map((doc) => (
+                          {pendingDocs.slice(0, 4).map((doc) => (
                             <TableRow key={doc._id || doc.id} className="border-zinc-800/60 hover:bg-zinc-900/40">
                               <TableCell className="font-semibold text-zinc-100 max-w-xs truncate">
                                 {doc.title}
@@ -803,7 +1364,7 @@ export default function AdminDashboard() {
                                   <Button
                                     size="sm"
                                     onClick={() => handleApproveDoc(doc._id || doc.id)}
-                                    className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold"
+                                    className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
                                   >
                                     Duyệt
                                   </Button>
@@ -811,7 +1372,7 @@ export default function AdminDashboard() {
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleOpenRejectModal(doc)}
-                                    className="h-7 px-2.5 border-zinc-800 text-red-400 hover:bg-red-500/10 rounded-lg text-xs"
+                                    className="h-7 px-2.5 border-zinc-800 text-red-400 hover:bg-red-500/10 rounded-lg text-xs cursor-pointer"
                                   >
                                     Từ chối
                                   </Button>
@@ -828,102 +1389,272 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* ================= TAB 2: USERS MANAGEMENT ================= */}
+          {/* ================= TAB 2: USERS MANAGEMENT (Yêu cầu 2 & 3 & 5) ================= */}
           {activeTab === "users" && (
-            <Card className="bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs overflow-hidden">
-              <CardHeader className="border-b border-zinc-800/60 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <CardTitle className="text-base font-bold text-white">Quản lý người dùng ({users.length})</CardTitle>
-                  <CardDescription className="text-xs text-zinc-400">Dữ liệu tài khoản thành viên từ MongoDB</CardDescription>
+            <div className="space-y-4">
+              {/* Informative notice banner for Moderator */}
+              {isModerator && (
+                <div className="p-3.5 rounded-2xl bg-indigo-950/40 border border-indigo-800/60 text-indigo-200 text-xs flex items-start gap-3 shadow-xs">
+                  <ShieldAlert className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-white text-xs">Chế độ Kiểm duyệt viên (Moderator)</p>
+                    <p className="text-indigo-300/90 text-[11px] leading-relaxed mt-0.5">
+                      Bạn có quyền xem danh sách thành viên. Để đảm bảo an toàn hệ thống, chức năng đổi vai trò và khóa/mở khóa tài khoản chỉ dành riêng cho Quản trị viên (Super Admin).
+                    </p>
+                  </div>
                 </div>
+              )}
 
-                <div className="relative w-64">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-3.5 h-3.5" />
-                  <Input
-                    placeholder="Tìm theo tên hoặc email..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 h-9 text-xs bg-zinc-900 border-zinc-800 text-white rounded-xl"
-                  />
+              {/* User KPI summary chips */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="p-3 rounded-xl bg-[#12131a] border border-zinc-800 text-center">
+                  <div className="text-[10px] text-zinc-400 font-bold uppercase">TỔNG THÀNH VIÊN</div>
+                  <div className="text-lg font-extrabold text-white mt-0.5">{users.length}</div>
                 </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-zinc-900/80 text-xs">
-                      <TableRow className="border-zinc-800">
-                        <TableHead className="text-zinc-400">Họ và tên</TableHead>
-                        <TableHead className="text-zinc-400">Email</TableHead>
-                        <TableHead className="text-zinc-400">Vai trò</TableHead>
-                        <TableHead className="text-zinc-400">Trạng thái</TableHead>
-                        <TableHead className="text-right text-zinc-400">Hành động</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody className="text-xs">
-                      {users
-                        .filter(
-                          (u) =>
-                            (u.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            (u.email || "").toLowerCase().includes(searchQuery.toLowerCase())
-                        )
-                        .map((u) => (
-                          <TableRow key={u._id} className="border-zinc-800/60 hover:bg-zinc-900/40">
-                            <TableCell className="font-semibold text-white">{u.name}</TableCell>
-                            <TableCell className="text-zinc-400">{u.email}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="outline"
-                                className={`text-[10px] ${
-                                  u.role === "admin"
-                                    ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                                    : "bg-zinc-900 text-zinc-300 border-zinc-800"
-                                }`}
-                              >
-                                {u.role}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="outline"
-                                className={`text-[10px] ${
-                                  u.status === "active"
-                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                                    : "bg-red-500/10 text-red-400 border-red-500/30"
-                                }`}
-                              >
-                                {u.status === "active" ? "Hoạt động" : "Bị khóa"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                variant={u.status === "active" ? "outline" : "default"}
-                                disabled={u._id === currentAdmin?.id || u._id === currentAdmin?._id}
-                                onClick={() => toggleUserStatus(u._id, u.status)}
-                                className={`h-7 px-2.5 text-xs font-semibold rounded-lg ${
-                                  u.status === "active"
-                                    ? "border-zinc-800 text-red-400 hover:bg-red-500/10"
-                                    : "bg-emerald-600 hover:bg-emerald-700 text-white"
-                                }`}
-                              >
-                                {u.status === "active" ? (
-                                  <>
-                                    <Lock className="w-3 h-3 mr-1" /> Khóa
-                                  </>
-                                ) : (
-                                  <>
-                                    <Unlock className="w-3 h-3 mr-1" /> Mở khóa
-                                  </>
-                                )}
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
+                <div className="p-3 rounded-xl bg-[#12131a] border border-zinc-800 text-center">
+                  <div className="text-[10px] text-blue-400 font-bold uppercase">SINH VIÊN</div>
+                  <div className="text-lg font-extrabold text-blue-300 mt-0.5">{studentUsersCount}</div>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="p-3 rounded-xl bg-[#12131a] border border-zinc-800 text-center">
+                  <div className="text-[10px] text-indigo-400 font-bold uppercase">KIỂM DUYỆT VIÊN</div>
+                  <div className="text-lg font-extrabold text-indigo-300 mt-0.5">{moderatorUsersCount}</div>
+                </div>
+                <div className="p-3 rounded-xl bg-[#12131a] border border-zinc-800 text-center">
+                  <div className="text-[10px] text-emerald-400 font-bold uppercase">QUẢN TRỊ VIÊN</div>
+                  <div className="text-lg font-extrabold text-emerald-300 mt-0.5">{adminUsersCount}</div>
+                </div>
+                <div className="p-3 rounded-xl bg-[#12131a] border border-zinc-800 text-center col-span-2 sm:col-span-1">
+                  <div className="text-[10px] text-rose-400 font-bold uppercase">TÀI KHOẢN KHÓA</div>
+                  <div className="text-lg font-extrabold text-rose-300 mt-0.5">{blockedUsersCount}</div>
+                </div>
+              </div>
+
+              {/* Users Table Card */}
+              <Card className="bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs overflow-hidden">
+                <CardHeader className="border-b border-zinc-800/60 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+                      <Users className="w-4 h-4 text-emerald-400" />
+                      <span>Danh sách tài khoản ({users.length})</span>
+                    </CardTitle>
+                    <CardDescription className="text-xs text-zinc-400">
+                      Tìm kiếm, lọc thành viên theo vai trò và trạng thái
+                    </CardDescription>
+                  </div>
+
+                  {/* Filter & Search Bar */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Search */}
+                    <div className="relative w-full sm:w-56">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-3.5 h-3.5" />
+                      <Input
+                        placeholder="Tìm theo tên hoặc email..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 h-9 text-xs bg-zinc-900 border-zinc-800 text-white rounded-xl focus:border-emerald-500"
+                      />
+                    </div>
+
+                    {/* Role Filter */}
+                    <Select value={userRoleFilter} onValueChange={setUserRoleFilter}>
+                      <SelectTrigger className="w-[140px] h-9 text-xs bg-zinc-900 border-zinc-800 text-zinc-200 rounded-xl">
+                        <SelectValue placeholder="Vai trò" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#181924] border-zinc-800 text-zinc-200 text-xs">
+                        <SelectItem value="all">Tất cả vai trò</SelectItem>
+                        <SelectItem value="student">Sinh viên</SelectItem>
+                        <SelectItem value="moderator">Kiểm duyệt viên</SelectItem>
+                        <SelectItem value="admin">Quản trị viên</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {/* Status Filter */}
+                    <Select value={userStatusFilter} onValueChange={setUserStatusFilter}>
+                      <SelectTrigger className="w-[130px] h-9 text-xs bg-zinc-900 border-zinc-800 text-zinc-200 rounded-xl">
+                        <SelectValue placeholder="Trạng thái" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#181924] border-zinc-800 text-zinc-200 text-xs">
+                        <SelectItem value="all">Tất cả</SelectItem>
+                        <SelectItem value="active">Hoạt động</SelectItem>
+                        <SelectItem value="blocked">Bị khóa</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {/* Reset Filters */}
+                    {(searchQuery || userRoleFilter !== "all" || userStatusFilter !== "all") && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setSearchQuery("");
+                          setUserRoleFilter("all");
+                          setUserStatusFilter("all");
+                        }}
+                        className="h-9 px-2.5 text-xs text-zinc-400 hover:text-white"
+                        title="Đặt lại bộ lọc"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto min-w-full">
+                    <Table>
+                      <TableHeader className="bg-zinc-900/80 text-xs">
+                        <TableRow className="border-zinc-800">
+                          <TableHead className="text-zinc-400">Thành viên</TableHead>
+                          <TableHead className="text-zinc-400">Email</TableHead>
+                          <TableHead className="text-zinc-400">Vai trò</TableHead>
+                          <TableHead className="text-zinc-400">Trạng thái</TableHead>
+                          <TableHead className="text-zinc-400">Ngày tham gia</TableHead>
+                          <TableHead className="text-right text-zinc-400">Hành động</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody className="text-xs">
+                        {users
+                          .filter((u) => {
+                            const nameMatch = (u.name || "").toLowerCase().includes(searchQuery.toLowerCase());
+                            const emailMatch = (u.email || "").toLowerCase().includes(searchQuery.toLowerCase());
+                            const matchesSearch = nameMatch || emailMatch;
+
+                            const userRole = u.role || "student";
+                            const matchesRole = userRoleFilter === "all" || userRole === userRoleFilter;
+
+                            const userStatus = u.status || "active";
+                            const matchesStatus = userStatusFilter === "all" || userStatus === userStatusFilter;
+
+                            return matchesSearch && matchesRole && matchesStatus;
+                          })
+                          .map((u) => {
+                            const isSelf = u._id === currentAdmin?._id || u._id === currentAdmin?.id;
+                            const role = u.role || "student";
+                            const status = u.status || "active";
+
+                            return (
+                              <TableRow key={u._id} className="border-zinc-800/60 hover:bg-zinc-900/40">
+                                <TableCell>
+                                  <div className="flex items-center gap-2.5">
+                                    <Avatar className="w-7 h-7 rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-200">
+                                      <AvatarFallback className="bg-zinc-800 text-zinc-300 font-bold text-xs rounded-lg">
+                                        {u.name ? u.name.charAt(0).toUpperCase() : "U"}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <div className="font-semibold text-white flex items-center gap-1.5">
+                                        <span>{u.name}</span>
+                                        {isSelf && (
+                                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-normal">
+                                            (Bạn)
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-zinc-400 font-mono text-[11px]">{u.email}</TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-[10px] font-semibold ${
+                                      role === "admin"
+                                        ? "bg-rose-500/15 text-rose-300 border-rose-500/30"
+                                        : role === "moderator"
+                                        ? "bg-indigo-500/15 text-indigo-300 border-indigo-500/30"
+                                        : "bg-zinc-900 text-zinc-300 border-zinc-800"
+                                    }`}
+                                  >
+                                    {role === "admin"
+                                      ? "Quản trị viên"
+                                      : role === "moderator"
+                                      ? "Kiểm duyệt viên"
+                                      : "Sinh viên"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-[10px] flex items-center w-fit gap-1 ${
+                                      status === "active"
+                                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                        : "bg-red-500/10 text-red-400 border-red-500/30"
+                                    }`}
+                                  >
+                                    <span
+                                      className={`w-1.5 h-1.5 rounded-full ${
+                                        status === "active" ? "bg-emerald-500" : "bg-red-500"
+                                      }`}
+                                    />
+                                    {status === "active" ? "Hoạt động" : "Bị khóa"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-zinc-400 whitespace-nowrap text-[11px]">
+                                  {u.createdAt ? new Date(u.createdAt).toLocaleDateString("vi-VN") : "-"}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    {/* Nút Đổi vai trò (Yêu cầu 3) */}
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={isModerator || isSelf}
+                                      onClick={() => handleOpenRoleModal(u)}
+                                      title={
+                                        isModerator
+                                          ? "Chỉ Quản trị viên mới có quyền đổi vai trò"
+                                          : isSelf
+                                          ? "Không thể tự đổi vai trò của chính mình"
+                                          : "Thay đổi vai trò người dùng"
+                                      }
+                                      className="h-7 px-2.5 text-xs font-semibold rounded-lg border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 cursor-pointer disabled:opacity-40"
+                                    >
+                                      <UserCog className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+                                      <span>Đổi vai trò</span>
+                                    </Button>
+
+                                    {/* Nút Khóa / Mở khóa tài khoản */}
+                                    <Button
+                                      size="sm"
+                                      variant={status === "active" ? "outline" : "default"}
+                                      disabled={isModerator || isSelf}
+                                      onClick={() => toggleUserStatus(u._id, status)}
+                                      title={
+                                        isModerator
+                                          ? "Chỉ Quản trị viên mới có quyền khóa/mở khóa"
+                                          : isSelf
+                                          ? "Không thể tự khóa tài khoản của mình"
+                                          : status === "active"
+                                          ? "Khóa tài khoản"
+                                          : "Mở khóa tài khoản"
+                                      }
+                                      className={`h-7 px-2.5 text-xs font-semibold rounded-lg cursor-pointer disabled:opacity-40 ${
+                                        status === "active"
+                                          ? "border-zinc-800 text-red-400 hover:bg-red-500/10"
+                                          : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                      }`}
+                                    >
+                                      {status === "active" ? (
+                                        <>
+                                          <Lock className="w-3 h-3 mr-1" /> Khóa
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Unlock className="w-3 h-3 mr-1" /> Mở khóa
+                                        </>
+                                      )}
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
 
           {/* ================= TAB 3: ALL DOCUMENTS ================= */}
@@ -931,12 +1662,17 @@ export default function AdminDashboard() {
             <Card className="bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs overflow-hidden">
               <CardHeader className="border-b border-zinc-800/60 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <CardTitle className="text-base font-bold text-white">Kho tài liệu ({allDocs.length})</CardTitle>
-                  <CardDescription className="text-xs text-zinc-400">Dữ liệu tài liệu tải lên từ MongoDB</CardDescription>
+                  <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+                    <Files className="w-4 h-4 text-emerald-400" />
+                    <span>Kho tài liệu ({allDocs.length})</span>
+                  </CardTitle>
+                  <CardDescription className="text-xs text-zinc-400">
+                    Toàn bộ tài liệu được đóng góp trên hệ thống
+                  </CardDescription>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="relative w-64">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative w-full sm:w-64">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-3.5 h-3.5" />
                     <Input
                       placeholder="Tìm theo tên tài liệu..."
@@ -959,8 +1695,9 @@ export default function AdminDashboard() {
                   </Select>
                 </div>
               </CardHeader>
+
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto min-w-full">
                   <Table>
                     <TableHeader className="bg-zinc-900/80 text-xs">
                       <TableRow className="border-zinc-800">
@@ -1005,24 +1742,27 @@ export default function AdminDashboard() {
                                 </Badge>
                               )}
                             </TableCell>
-                            <TableCell className="text-zinc-400">{doc.downloadCount || 0}</TableCell>
+                            <TableCell className="text-zinc-400 font-mono">{doc.downloadCount || 0}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
                                 {doc.fileUrl && (
                                   <a href={doc.fileUrl} target="_blank" rel="noreferrer">
-                                    <Button size="sm" variant="outline" className="h-7 px-2 border-zinc-800 text-zinc-300 rounded-lg">
+                                    <Button size="sm" variant="outline" className="h-7 px-2 border-zinc-800 text-zinc-300 rounded-lg cursor-pointer">
                                       <Eye className="w-3.5 h-3.5" />
                                     </Button>
                                   </a>
                                 )}
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleDeleteDoc(doc._id || doc.id)}
-                                  className="h-7 px-2 border-zinc-800 text-red-400 hover:bg-red-500/10 rounded-lg"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
+                                {!isModerator && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDeleteDoc(doc._id || doc.id)}
+                                    className="h-7 px-2 border-zinc-800 text-red-400 hover:bg-red-500/10 rounded-lg cursor-pointer"
+                                    title="Xóa vĩnh viễn (Chỉ Admin)"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -1039,8 +1779,11 @@ export default function AdminDashboard() {
             <Card className="bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs overflow-hidden p-5 space-y-4">
               <div className="flex items-center justify-between border-b border-zinc-800/60 pb-4">
                 <div>
-                  <h3 className="text-base font-bold text-white">Danh mục học phần ({subjects.length})</h3>
-                  <p className="text-xs text-zinc-400">Học phần được tổng hợp từ dữ liệu tài liệu trong MongoDB</p>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <GraduationCap className="w-4 h-4 text-emerald-400" />
+                    <span>Danh mục học phần ({subjects.length})</span>
+                  </h3>
+                  <p className="text-xs text-zinc-400">Học phần và số lượng tài liệu tham khảo tương ứng</p>
                 </div>
               </div>
 
@@ -1057,7 +1800,7 @@ export default function AdminDashboard() {
                         </span>
                       )}
                       <h4 className="font-bold text-white text-sm pt-1">{sub.name}</h4>
-                      <p className="text-[11px] text-zinc-400">{sub.count} tài liệu</p>
+                      <p className="text-[11px] text-zinc-400">{sub.count} tài liệu học tập</p>
                     </div>
                   </div>
                 ))}
@@ -1065,133 +1808,19 @@ export default function AdminDashboard() {
             </Card>
           )}
 
-          {/* ================= TAB 5: REPORTS MANAGEMENT ================= */}
-          {activeTab === "reports" && (
-            <Card className="bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs overflow-hidden">
-              <CardHeader className="border-b border-zinc-800/60 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <CardTitle className="text-base font-bold text-white">Quản lý báo cáo ({reports.length})</CardTitle>
-                  <CardDescription className="text-xs text-zinc-400">Báo cáo tài liệu do thành viên gửi lên</CardDescription>
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <Badge variant="outline" className="bg-amber-500/10 text-amber-300 border-amber-500/30">
-                    {pendingReportsCount} chờ xử lý
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                {reports.length === 0 ? (
-                  <div className="text-center py-16 space-y-2">
-                    <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto opacity-90" />
-                    <p className="font-bold text-white text-sm">Chưa có báo cáo nào</p>
-                    <p className="text-xs text-zinc-400">Các báo cáo từ thành viên sẽ hiển thị tại đây.</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader className="bg-zinc-900/80 text-xs">
-                        <TableRow className="border-zinc-800">
-                          <TableHead className="text-zinc-400">Tài liệu</TableHead>
-                          <TableHead className="text-zinc-400">Người báo cáo</TableHead>
-                          <TableHead className="text-zinc-400">Lý do</TableHead>
-                          <TableHead className="text-zinc-400">Trạng thái</TableHead>
-                          <TableHead className="text-zinc-400">Ngày gửi</TableHead>
-                          <TableHead className="text-right text-zinc-400">Thao tác</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody className="text-xs">
-                        {reports.map((report) => (
-                          <TableRow key={report._id} className="border-zinc-800/60 hover:bg-zinc-900/40 align-top">
-                            <TableCell className="font-semibold text-white max-w-[220px]">
-                              <div className="truncate" title={report.documentId?.title}>
-                                {report.documentId?.title || "Tài liệu đã bị xóa"}
-                              </div>
-                              {report.documentId?.fileUrl && (
-                                <a href={report.documentId.fileUrl} target="_blank" rel="noreferrer" className="text-[10px] text-emerald-400 hover:underline">
-                                  Xem tài liệu
-                                </a>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-zinc-300">
-                              <div>{report.reporterId?.name || "Thành viên"}</div>
-                              <div className="text-[10px] text-zinc-500">{report.reporterId?.email || ""}</div>
-                            </TableCell>
-                            <TableCell className="text-zinc-400 max-w-[260px] whitespace-normal">
-                              {report.reason}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="outline"
-                                className={`text-[10px] ${
-                                  report.status === "pending"
-                                    ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
-                                    : report.status === "resolved"
-                                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                                      : "bg-zinc-900 text-zinc-400 border-zinc-700"
-                                }`}
-                              >
-                                {report.status === "pending" ? "Chờ xử lý" : report.status === "resolved" ? "Đã xử lý" : "Đã bỏ qua"}
-                              </Badge>
-                              {report.handledBy?.name && (
-                                <div className="mt-1 text-[10px] text-zinc-500">bởi {report.handledBy.name}</div>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-zinc-400 whitespace-nowrap">
-                              {report.createdAt ? new Date(report.createdAt).toLocaleDateString("vi-VN") : "-"}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {report.status === "pending" ? (
-                                <div className="flex items-center justify-end gap-2">
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleReportAction(report, "hide")}
-                                    className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold"
-                                  >
-                                    <CheckCircle className="w-3 h-3 mr-1" />
-                                    Ẩn tài liệu
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleReportAction(report, "delete")}
-                                    className="h-7 px-2.5 border-red-900/60 text-red-400 hover:text-red-300 hover:bg-red-950/40 rounded-lg text-xs"
-                                  >
-                                    Xóa tài liệu
-                                  </Button>
-                                </div>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleReopenReport(report)}
-                                  disabled={!report.documentId?._id}
-                                  title={!report.documentId?._id ? "Tài liệu đã bị xóa, không thể khôi phục" : "Mở lại báo cáo và tài liệu"}
-                                  className="h-7 px-2.5 border-zinc-800 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded-lg text-xs disabled:opacity-50"
-                                >
-                                  Mở lại
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* ================= TAB 6: PENDING QUEUE ================= */}
+          {/* ================= TAB 5: PENDING QUEUE (Kiểm duyệt tài liệu) ================= */}
           {activeTab === "pending" && (
             <Card className="bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs overflow-hidden">
-              <CardHeader className="border-b border-zinc-800/60 pb-4">
-                <CardTitle className="text-base font-bold text-white">
-                  Hàng đợi kiểm duyệt ({pendingDocs.length})
-                </CardTitle>
-                <CardDescription className="text-xs text-zinc-400">
-                  Dữ liệu tài liệu đang chờ duyệt từ MongoDB
-                </CardDescription>
+              <CardHeader className="border-b border-zinc-800/60 pb-4 flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+                    <FileCheck2 className="w-4 h-4 text-amber-400" />
+                    <span>Hàng đợi kiểm duyệt tài liệu ({pendingDocs.length})</span>
+                  </CardTitle>
+                  <CardDescription className="text-xs text-zinc-400">
+                    Phê duyệt hoặc từ chối các tài liệu mới do cộng đồng gửi lên
+                  </CardDescription>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 {pendingDocs.length === 0 ? (
@@ -1201,7 +1830,7 @@ export default function AdminDashboard() {
                     <p className="text-xs text-zinc-400">Tất cả tài liệu mới đã được xử lý xong.</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto min-w-full">
                     <Table>
                       <TableHeader className="bg-zinc-900/80 text-xs">
                         <TableRow className="border-zinc-800">
@@ -1228,17 +1857,17 @@ export default function AdminDashboard() {
                               <div className="text-zinc-200 font-medium">{doc.uploaderId?.name || "Thành viên"}</div>
                               <div className="text-[10px] text-zinc-500">{doc.uploaderId?.email}</div>
                             </TableCell>
-                            <TableCell className="text-zinc-400 font-mono">
+                            <TableCell className="text-zinc-400 font-mono text-[11px]">
                               {doc.fileType || "PDF"}
                             </TableCell>
-                            <TableCell className="text-zinc-400">
+                            <TableCell className="text-zinc-400 text-[11px]">
                               {doc.createdAt ? new Date(doc.createdAt).toLocaleDateString("vi-VN") : "Hôm nay"}
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
                                 {doc.fileUrl && (
                                   <a href={doc.fileUrl} target="_blank" rel="noreferrer">
-                                    <Button size="sm" variant="outline" className="h-8 px-2.5 border-zinc-800 text-zinc-300 hover:bg-zinc-800 rounded-lg">
+                                    <Button size="sm" variant="outline" className="h-8 px-2.5 border-zinc-800 text-zinc-300 hover:bg-zinc-800 rounded-lg cursor-pointer">
                                       <Eye className="w-3.5 h-3.5" />
                                     </Button>
                                   </a>
@@ -1246,7 +1875,7 @@ export default function AdminDashboard() {
                                 <Button
                                   size="sm"
                                   onClick={() => handleApproveDoc(doc._id || doc.id)}
-                                  className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold"
+                                  className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
                                 >
                                   <CheckCircle className="w-3.5 h-3.5 mr-1" />
                                   Duyệt
@@ -1255,7 +1884,7 @@ export default function AdminDashboard() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleOpenRejectModal(doc)}
-                                  className="h-8 px-3 border-zinc-800 text-red-400 hover:bg-red-500/10 rounded-lg text-xs font-semibold"
+                                  className="h-8 px-3 border-zinc-800 text-red-400 hover:bg-red-500/10 rounded-lg text-xs font-semibold cursor-pointer"
                                 >
                                   <XCircle className="w-3.5 h-3.5 mr-1" />
                                   Từ chối
@@ -1271,10 +1900,207 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           )}
+
+          {/* ================= TAB 6: REPORTS MANAGEMENT ================= */}
+          {activeTab === "reports" && (
+            <Card className="bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs">
+              <CardHeader className="p-5 border-b border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+                    <MessageSquareWarning className="w-4 h-4 text-emerald-400" />
+                    <span>Quản lý báo cáo vi phạm ({reports.length})</span>
+                  </CardTitle>
+                  <CardDescription className="text-xs text-zinc-400">
+                    Xử lý các phản ánh vi phạm từ thành viên và tự động gửi thông báo kết quả.
+                  </CardDescription>
+                </div>
+
+                {/* Filter tabs */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex rounded-xl bg-zinc-900 border border-zinc-800 p-0.5 text-xs">
+                    {[
+                      { id: "all", label: "Tất cả", count: reports.length },
+                      { id: "pending", label: "Chờ xử lý", count: pendingReportsCount },
+                      {
+                        id: "resolved",
+                        label: "Đã xử lý",
+                        count: reports.filter((r) => r.status === "resolved").length,
+                      },
+                      {
+                        id: "dismissed",
+                        label: "Đã bỏ qua",
+                        count: reports.filter((r) => r.status === "dismissed").length,
+                      },
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setReportFilter(tab.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          reportFilter === tab.id
+                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                            : "text-zinc-400 hover:text-zinc-200"
+                        }`}
+                      >
+                        {tab.label} ({tab.count})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="p-0">
+                {reports.filter((r) => reportFilter === "all" || r.status === reportFilter).length === 0 ? (
+                  <div className="p-12 text-center text-zinc-500 text-xs">
+                    Không có báo cáo nào ở danh mục này.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto min-w-full">
+                    <Table>
+                      <TableHeader className="bg-zinc-900/50">
+                        <TableRow className="border-zinc-800/80 hover:bg-transparent">
+                          <TableHead className="text-[11px] font-bold text-zinc-400 uppercase">Tài liệu</TableHead>
+                          <TableHead className="text-[11px] font-bold text-zinc-400 uppercase">Người báo cáo</TableHead>
+                          <TableHead className="text-[11px] font-bold text-zinc-400 uppercase">Lý do vi phạm</TableHead>
+                          <TableHead className="text-[11px] font-bold text-zinc-400 uppercase">Ngày gửi</TableHead>
+                          <TableHead className="text-[11px] font-bold text-zinc-400 uppercase">Trạng thái</TableHead>
+                          <TableHead className="text-[11px] font-bold text-zinc-400 uppercase text-right">Thao tác</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody className="divide-y divide-zinc-800/60">
+                        {reports
+                          .filter((r) => reportFilter === "all" || r.status === reportFilter)
+                          .map((report) => {
+                            const isPending = report.status === "pending";
+                            const isResolved = report.status === "resolved";
+                            const docId = report.documentId?._id || report.documentId;
+                            const docTitle = report.documentId?.title || "Tài liệu bị xóa";
+
+                            return (
+                              <TableRow key={report._id} className="border-zinc-800/60 hover:bg-zinc-900/40">
+                                <TableCell className="font-semibold text-xs text-zinc-200 max-w-[200px]">
+                                  {report.documentId ? (
+                                    <a
+                                      href={`/document/${docId}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="hover:text-emerald-400 transition-colors line-clamp-1 flex items-center gap-1.5"
+                                    >
+                                      <span>{docTitle}</span>
+                                      <ExternalLink className="w-3 h-3 shrink-0 opacity-50" />
+                                    </a>
+                                  ) : (
+                                    <span className="text-zinc-500 italic">Đã xóa khỏi hệ thống</span>
+                                  )}
+                                </TableCell>
+
+                                <TableCell className="text-xs text-zinc-400">
+                                  <div>
+                                    <div className="font-medium text-zinc-200">
+                                      {report.reporterId?.name || "Người dùng StudyHub"}
+                                    </div>
+                                    <div className="text-[10px] text-zinc-500">{report.reporterId?.email}</div>
+                                  </div>
+                                </TableCell>
+
+                                <TableCell className="text-xs text-zinc-300 max-w-[240px]">
+                                  <div className="line-clamp-2" title={report.reason}>
+                                    {report.reason}
+                                  </div>
+                                  {report.adminFeedback && (
+                                    <div className="text-[10px] text-emerald-400/90 mt-1 italic line-clamp-1">
+                                      Phản hồi: {report.adminFeedback}
+                                    </div>
+                                  )}
+                                </TableCell>
+
+                                <TableCell className="text-xs text-zinc-400 whitespace-nowrap text-[11px]">
+                                  {new Date(report.createdAt).toLocaleDateString("vi-VN", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                  })}
+                                </TableCell>
+
+                                <TableCell>
+                                  {isPending && (
+                                    <Badge className="bg-amber-500/15 text-amber-300 border-amber-500/30 text-[10px] font-bold">
+                                      Chờ xử lý
+                                    </Badge>
+                                  )}
+                                  {isResolved && (
+                                    <Badge className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30 text-[10px] font-bold">
+                                      Đã xử lý
+                                    </Badge>
+                                  )}
+                                  {report.status === "dismissed" && (
+                                    <Badge className="bg-zinc-800 text-zinc-400 border-zinc-700 text-[10px] font-bold">
+                                      Đã bỏ qua
+                                    </Badge>
+                                  )}
+                                </TableCell>
+
+                                <TableCell className="text-right whitespace-nowrap">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    {isPending ? (
+                                      <>
+                                        <Button
+                                          size="sm"
+                                          onClick={() => handleOpenReportModal(report, "resolve_reject")}
+                                          className="h-7 px-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                                          title="Gỡ tài liệu và chấp thuận báo cáo"
+                                        >
+                                          Xử lý vi phạm
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => handleOpenReportModal(report, "dismiss")}
+                                          className="h-7 px-2.5 border-zinc-800 text-zinc-400 hover:bg-zinc-800 rounded-lg text-xs font-semibold cursor-pointer"
+                                          title="Bỏ qua báo cáo này"
+                                        >
+                                          Bỏ qua
+                                        </Button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => handleReopenReport(report)}
+                                          className="h-7 px-2 border-zinc-800 text-zinc-400 hover:text-white rounded-lg text-xs cursor-pointer"
+                                        >
+                                          Mở lại
+                                        </Button>
+                                        {!isModerator && (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => handleDeleteReport(report._id)}
+                                            className="h-7 px-2 border-zinc-800 text-red-400 hover:bg-red-500/10 rounded-lg text-xs cursor-pointer"
+                                            title="Xóa nhật ký báo cáo (Chỉ Admin)"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </Button>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </main>
       </div>
 
-      {/* Reject Modal */}
+      {/* ================= DIALOG 1: REJECT DOCUMENT MODAL ================= */}
       <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
         <DialogContent className="sm:max-w-[420px] p-6 rounded-2xl bg-[#141620] border-zinc-800 text-zinc-100 text-left shadow-2xl">
           <DialogHeader className="space-y-1">
@@ -1312,6 +2138,220 @@ export default function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
+      {/* ================= DIALOG 2: REPORT ACTION & FEEDBACK MODAL ================= */}
+      <Dialog open={reportModalOpen} onOpenChange={setReportModalOpen}>
+        <DialogContent className="sm:max-w-[440px] p-6 rounded-2xl bg-[#141620] border-zinc-800 text-zinc-100 text-left shadow-2xl">
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="text-base font-bold text-white flex items-center gap-2">
+              <MessageSquareWarning className="w-4 h-4 text-emerald-400" />
+              <span>
+                {reportActionType === "dismiss" ? "Bỏ qua báo cáo vi phạm" : "Xử lý vi phạm tài liệu"}
+              </span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400 line-clamp-1">
+              Tài liệu: {selectedReportForAction?.documentId?.title || "Tài liệu"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 pt-2">
+            <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800/80 text-xs space-y-1">
+              <span className="font-semibold text-zinc-300">Lý do thành viên báo cáo:</span>
+              <p className="text-zinc-400">{selectedReportForAction?.reason}</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-zinc-300">
+                Ghi chú phản hồi cho người báo cáo (Notification)
+              </Label>
+              <textarea
+                rows={3}
+                value={reportFeedbackText}
+                onChange={(e) => setReportFeedbackText(e.target.value)}
+                placeholder="Nhập lý do xử lý hoặc lời nhắn gửi đến thành viên..."
+                className="w-full p-2.5 text-xs rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+              />
+              <p className="text-[11px] text-zinc-500">
+                Lời nhắn này sẽ hiển thị trực tiếp trong hòm thư Thông báo của thành viên đã gửi báo cáo.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setReportModalOpen(false)}
+              className="border-zinc-800 text-zinc-300 hover:bg-zinc-800"
+            >
+              Hủy
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleConfirmReportModal}
+              className={
+                reportActionType === "dismiss"
+                  ? "bg-zinc-700 hover:bg-zinc-600 text-white font-semibold"
+                  : "bg-red-600 hover:bg-red-700 text-white font-semibold"
+              }
+            >
+              Xác nhận & Gửi thông báo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ================= DIALOG 3: ROLE CHANGE MODAL (Yêu cầu 3) ================= */}
+      <Dialog open={roleModalOpen} onOpenChange={setRoleModalOpen}>
+        <DialogContent className="sm:max-w-[480px] p-6 rounded-2xl bg-[#141620] border-zinc-800 text-zinc-100 text-left shadow-2xl">
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="text-base font-bold text-white flex items-center gap-2">
+              <UserCog className="w-5 h-5 text-emerald-400" />
+              <span>Thay đổi vai trò người dùng</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">
+              Phân quyền tài khoản trong hệ thống StudyHub
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-2">
+            {/* User Target Info Card */}
+            <div className="p-3.5 rounded-xl bg-zinc-900 border border-zinc-800/80 flex items-center gap-3">
+              <Avatar className="w-10 h-10 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-200">
+                <AvatarFallback className="bg-zinc-800 text-zinc-300 font-bold text-sm">
+                  {selectedUserForRole?.name ? selectedUserForRole.name.charAt(0).toUpperCase() : "U"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <div className="font-bold text-white text-sm truncate">{selectedUserForRole?.name}</div>
+                <div className="text-xs text-zinc-400 truncate">{selectedUserForRole?.email}</div>
+              </div>
+              <Badge
+                variant="outline"
+                className="text-[10px] font-semibold bg-zinc-800 text-zinc-300 border-zinc-700 uppercase shrink-0"
+              >
+                Hiện tại: {selectedUserForRole?.role || "student"}
+              </Badge>
+            </div>
+
+            {/* Role Options Cards */}
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold text-zinc-300">Chọn vai trò mới</Label>
+
+              {/* Option 1: Student */}
+              <div
+                onClick={() => setSelectedNewRole("student")}
+                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
+                  selectedNewRole === "student"
+                    ? "bg-blue-500/10 border-blue-500/50 shadow-xs"
+                    : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900"
+                }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                    selectedNewRole === "student" ? "bg-blue-500 text-white" : "bg-zinc-800 text-zinc-400"
+                  }`}
+                >
+                  <GraduationCap className="w-4 h-4" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-white">Sinh viên (Student)</span>
+                    {selectedNewRole === "student" && <Check className="w-4 h-4 text-blue-400" />}
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
+                    Quyền cơ bản: xem tài liệu, tải xuống, đăng tài liệu và gửi báo cáo vi phạm.
+                  </p>
+                </div>
+              </div>
+
+              {/* Option 2: Moderator */}
+              <div
+                onClick={() => setSelectedNewRole("moderator")}
+                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
+                  selectedNewRole === "moderator"
+                    ? "bg-indigo-500/10 border-indigo-500/50 shadow-xs"
+                    : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900"
+                }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                    selectedNewRole === "moderator" ? "bg-indigo-500 text-white" : "bg-zinc-800 text-zinc-400"
+                  }`}
+                >
+                  <Shield className="w-4 h-4" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-white">Kiểm duyệt viên (Moderator)</span>
+                    {selectedNewRole === "moderator" && <Check className="w-4 h-4 text-indigo-400" />}
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
+                    Quyền kiểm duyệt: duyệt/từ chối tài liệu mới, tiếp nhận và xử lý các báo cáo vi phạm cộng đồng.
+                  </p>
+                </div>
+              </div>
+
+              {/* Option 3: Admin */}
+              <div
+                onClick={() => setSelectedNewRole("admin")}
+                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
+                  selectedNewRole === "admin"
+                    ? "bg-rose-500/10 border-rose-500/50 shadow-xs"
+                    : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900"
+                }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                    selectedNewRole === "admin" ? "bg-rose-500 text-white" : "bg-zinc-800 text-zinc-400"
+                  }`}
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-white">Quản trị viên (Admin)</span>
+                    {selectedNewRole === "admin" && <Check className="w-4 h-4 text-rose-400" />}
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
+                    Toàn quyền hệ thống: quản lý tài khoản, thay đổi vai trò người dùng, xóa tài liệu và cấu hình.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={roleUpdating}
+              onClick={() => setRoleModalOpen(false)}
+              className="border-zinc-800 text-zinc-300 hover:bg-zinc-800"
+            >
+              Hủy
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={roleUpdating || selectedNewRole === selectedUserForRole?.role}
+              onClick={handleSaveUserRole}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold cursor-pointer"
+            >
+              {roleUpdating ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" />
+                  Đang lưu...
+                </>
+              ) : (
+                "Lưu thay đổi vai trò"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
