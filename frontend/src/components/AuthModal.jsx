@@ -133,21 +133,13 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
             setLoading(true);
             setError("");
             try {
-              // 1. Lấy thông tin user từ Google API
-              const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-              });
-              const googleUser = await userInfoRes.json();
-
-              // 2. Gửi thông tin về backend StudyHub
+              // Backend verifies the Google access token and fetches account data itself.
               const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
               const res = await fetch(`${apiUrl}/auth/google`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  email: googleUser.email,
-                  name: googleUser.name,
-                  avatarUrl: googleUser.picture,
+                  accessToken: tokenResponse.access_token,
                 }),
               });
 
