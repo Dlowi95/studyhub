@@ -17,6 +17,18 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const app = express();
 const port = process.env.PORT || 5000;
 const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/studyhub";
+const isLocalMongo = /^mongodb:\/\/(127\.0\.0\.1|localhost)(:|\/)/i.test(mongoUri);
+
+const mongoOptions = {
+  serverSelectionTimeoutMS: 30000,
+  connectTimeoutMS: 30000,
+  socketTimeoutMS: 30000,
+};
+
+if (!isLocalMongo) {
+  mongoOptions.tls = true;
+  mongoOptions.tlsAllowInvalidCertificates = false;
+}
 
 app.use(cors());
 app.use(express.json());
@@ -45,13 +57,7 @@ app.get("/", (req, res) => {
 });
 
 mongoose
-  .connect(mongoUri, {
-    serverSelectionTimeoutMS: 30000,
-    connectTimeoutMS: 30000,
-    socketTimeoutMS: 30000,
-    tls: true,
-    tlsAllowInvalidCertificates: false,
-  })
+  .connect(mongoUri, mongoOptions)
   .then(() => {
     console.log("MongoDB connected successfully");
 
