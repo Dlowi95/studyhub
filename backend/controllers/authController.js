@@ -19,12 +19,18 @@ const saveLocalAvatar = async (file) => {
 exports.register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
+    const normalizedName = typeof name === "string" ? name.trim() : "";
+    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
 
-    if (!name || !email || !password) {
+    if (!normalizedName || !normalizedEmail || !password) {
       return res.status(400).json({ message: "Name, email and password are required" });
     }
 
-    const existingUser = await User.findOne({ email });
+    if (password.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters" });
+    }
+
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({ message: "Email is already registered" });
     }
@@ -33,8 +39,8 @@ exports.register = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, salt);
 
     const newUser = new User({
-      name,
-      email,
+      name: normalizedName,
+      email: normalizedEmail,
       passwordHash,
       role: "student",
       status: "active",
@@ -70,12 +76,13 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.status(400).json({ message: "Invalid email or password" });
     }
@@ -195,37 +202,64 @@ exports.updateProfile = async (req, res) => {
 
 exports.googleLogin = async (req, res) => {
   try {
-    const { email, name, avatarUrl } = req.body;
+    const { accessToken } = req.body;
 
-    if (!email) {
-      return res.status(400).json({ message: "Email is required from Google account" });
+    if (!accessToken || typeof accessToken !== "string") {
+      return res.status(400).json({ message: "Google access token is required" });
     }
 
-    // Check if user exists
-    let user = await User.findOne({ email });
+    const googleClientId = process.env.GOOGLE_CLIENT_ID;
+    if (!googleClientId) {
+      return res.status(503).json({ message: "Google login is not configured on the server" });
+    }
+
+    const tokenInfoRes = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
+    );
+
+    if (!tokenInfoRes.ok) {
+      return res.status(401).json({ message: "Google token is invalid or expired" });
+    }
+
+    const tokenInfo = await tokenInfoRes.json();
+    if (tokenInfo.aud !== googleClientId) {
+      return res.status(401).json({ message: "Google token audience is invalid" });
+    }
+
+    const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!userInfoRes.ok) {
+      return res.status(401).json({ message: "Unable to verify Google account" });
+    }
+
+    const googleUser = await userInfoRes.json();
+    const normalizedEmail =
+      typeof googleUser.email === "string" ? googleUser.email.trim().toLowerCase() : "";
+
+    if (!normalizedEmail || googleUser.email_verified !== true) {
+      return res.status(401).json({ message: "Google account email is not verified" });
+    }
+
+    let user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
-      const userCount = await User.countDocuments();
-      const assignedRole = userCount === 0 ? "admin" : "student";
-
       const dummyHash = await bcrypt.hash(Math.random().toString(36), 10);
 
       user = new User({
-        name: name || email.split("@")[0],
-        email,
+        name: googleUser.name || normalizedEmail.split("@")[0],
+        email: normalizedEmail,
         passwordHash: dummyHash,
-        role: assignedRole,
-        avatarUrl: avatarUrl || "",
+        role: "student",
+        avatarUrl: googleUser.picture || "",
         status: "active",
       });
 
       await user.save();
-    } else {
-      // Keep a previously uploaded avatar instead of replacing it on Google login.
-      if (avatarUrl && !user.avatarUrl) {
-        user.avatarUrl = avatarUrl;
-        await user.save();
-      }
+    } else if (googleUser.picture && !user.avatarUrl) {
+      user.avatarUrl = googleUser.picture;
+      await user.save();
     }
 
     if (user.status === "blocked") {
@@ -251,7 +285,7 @@ exports.googleLogin = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({ message: "Lỗi xử lý đăng nhập Google", error: error.message });
+    console.error("Google login error:", error);
+    return res.status(500).json({ message: "Lỗi xử lý đăng nhập Google" });
   }
 };
-
