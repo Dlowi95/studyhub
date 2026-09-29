@@ -17,7 +17,16 @@ const { authenticateToken, authorizeRoles } = require("../middleware/auth");
 router.post(
   "/upload",
   authenticateToken,
-  upload.single("file"),
+  (req, res, next) => {
+    upload.single("file")(req, res, (error) => {
+      if (!error) return next();
+      const status = error.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+      const message = error.code === "LIMIT_FILE_SIZE"
+        ? "Dung lượng tệp tối đa là 25MB"
+        : error.message || "Không thể đọc tệp tải lên";
+      return res.status(status).json({ message });
+    });
+  },
   uploadDocument
 );
 

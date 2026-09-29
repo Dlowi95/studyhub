@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   UploadCloud,
@@ -41,6 +41,7 @@ export default function UploadDocument() {
   const [description, setDescription] = useState("");
   const [file, setFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [subjectOptions, setSubjectOptions] = useState(SUBJECT_OPTIONS);
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -49,6 +50,27 @@ export default function UploadDocument() {
   const fileInputRef = useRef(null);
   const { toast } = useToast();
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch(`${apiUrl}/subjects`)
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Không thể tải học phần"))))
+      .then((data) => {
+        if (cancelled) return;
+        const savedSubjects = Array.isArray(data.subjects)
+          ? data.subjects.map((item) => item.name).filter(Boolean)
+          : [];
+        setSubjectOptions([...new Set([...savedSubjects, ...SUBJECT_OPTIONS])]);
+      })
+      .catch(() => {
+        if (!cancelled) setSubjectOptions(SUBJECT_OPTIONS);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrl]);
 
   const handleFileSelect = (selectedFile) => {
     if (!selectedFile) return;
@@ -59,9 +81,9 @@ export default function UploadDocument() {
     }
 
     const ext = selectedFile.name.split(".").pop().toLowerCase();
-    const validExtensions = ["pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "txt"];
+    const validExtensions = ["pdf", "docx", "pptx", "xlsx", "txt"];
     if (!validExtensions.includes(ext)) {
-      setError("Chỉ chấp nhận file định dạng PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, TXT.");
+      setError("Chỉ chấp nhận file định dạng PDF, DOCX, PPTX, XLSX hoặc TXT.");
       return;
     }
 
@@ -262,7 +284,7 @@ export default function UploadDocument() {
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
-                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt"
+                accept=".pdf,.docx,.pptx,.xlsx,.txt"
                 onChange={(e) => handleFileSelect(e.target.files?.[0])}
               />
 
@@ -290,7 +312,7 @@ export default function UploadDocument() {
                       Kéo thả tệp tài liệu vào đây hoặc <span className="text-primary underline">chọn tệp từ máy tính</span>
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Hỗ trợ PDF, DOC, DOCX, PPT, PPTX, XLS, TXT (Tối đa 25MB)
+                      Hỗ trợ PDF, DOCX, PPTX, XLSX, TXT (Tối đa 25MB)
                     </p>
                   </div>
                 </>
@@ -327,7 +349,7 @@ export default function UploadDocument() {
                 required
               >
                 <option value="">-- Chọn học phần --</option>
-                {SUBJECT_OPTIONS.map((sub) => (
+                {subjectOptions.map((sub) => (
                   <option key={sub} value={sub}>
                     {sub}
                   </option>

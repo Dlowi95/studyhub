@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import StarRating from "./StarRating";
 import { Loader2 } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 /**
  * Form gửi đánh giá (sao + bình luận) cho 1 tài liệu.
@@ -28,9 +27,13 @@ export default function ReviewForm({ documentId, onSuccess }) {
     return (
       <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
         Bạn cần{" "}
-        <Link to="/login" className="font-medium text-primary underline underline-offset-2">
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent("openAuthModal", { detail: { tab: "login" } }))}
+          className="font-medium text-primary underline underline-offset-2 cursor-pointer"
+        >
           đăng nhập
-        </Link>{" "}
+        </button>{" "}
         để đánh giá tài liệu này.
       </div>
     );

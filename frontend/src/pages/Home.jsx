@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useCallback, useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Search,
@@ -15,15 +15,61 @@ import {
   Calculator,
   TrendingUp,
   Landmark,
+  ShieldCheck,
+  Users2,
+  ArrowUpRight,
 } from "lucide-react";
 import DocumentCard from "@/components/DocumentCard";
 import SubjectFilter from "@/components/SubjectFilter";
 import ReportModal from "@/components/ReportModal";
 import UploadModal from "@/components/UploadModal";
+import heroVisual from "@/assets/studyhub-hero-visual.png";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
+const normalizeDocument = (doc) => ({
+  id: doc._id || doc.id,
+  title: doc.title || "Tài liệu chưa có tiêu đề",
+  subject: doc.subjectName || doc.subjectId?.name || "Khác",
+  downloads: doc.downloadCount || 0,
+  rating: doc.avgRating || 0,
+  type: (doc.fileType || "PDF").toString().toUpperCase(),
+  uploader: doc.uploaderId?.name || "Thành viên StudyHub",
+  isVerified: doc.status === "approved",
+  size: doc.fileSize ? `${(doc.fileSize / 1024 / 1024).toFixed(1)} MB` : null,
+  fileUrl: doc.fileUrl,
+  createdAt: doc.createdAt,
+});
+
+const studyJourney = [
+  {
+    step: "01",
+    title: "Tìm đúng nội dung",
+    description: "Tra cứu theo tên tài liệu, học phần hoặc chọn nhanh nhóm ngành phù hợp.",
+    icon: Search,
+    tone: "bg-emerald-500 text-white shadow-emerald-500/25",
+  },
+  {
+    step: "02",
+    title: "Xem trước an toàn",
+    description: "Kiểm tra nội dung ngay trên trình duyệt cùng trạng thái kiểm duyệt rõ ràng.",
+    icon: ShieldCheck,
+    tone: "bg-cyan-500 text-white shadow-cyan-500/25",
+  },
+  {
+    step: "03",
+    title: "Tải về hoặc đóng góp",
+    description: "Lưu tài liệu miễn phí và chia sẻ học liệu hữu ích cho cộng đồng sinh viên.",
+    icon: UploadCloud,
+    tone: "bg-violet-500 text-white shadow-violet-500/25",
+  },
+];
 
 export default function Home({ onOpenAuth, user }) {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(
+    () => new URLSearchParams(window.location.search).get("search") || ""
+  );
   const [selectedSubject, setSelectedSubject] = useState("");
   const [sortBy, setSortBy] = useState("latest"); // "latest" | "popular" | "rating"
   const [openFaqIndex, setOpenFaqIndex] = useState(0);
@@ -33,26 +79,10 @@ export default function Home({ onOpenAuth, user }) {
   const [documents, setDocuments] = useState([]);
   const [loadingDocs, setLoadingDocs] = useState(true);
 
-  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-
-  const normalizeDocument = (doc) => ({
-    id: doc._id || doc.id,
-    title: doc.title || "Tài liệu chưa có tiêu đề",
-    subject: doc.subjectName || doc.subjectId?.name || "Khác",
-    downloads: doc.downloadCount || 0,
-    rating: doc.avgRating || 0,
-    type: (doc.fileType || "PDF").toString().toUpperCase(),
-    uploader: doc.uploaderId?.name || "Thành viên StudyHub",
-    isVerified: doc.status === "approved",
-    size: doc.fileSize ? `${(doc.fileSize / 1024 / 1024).toFixed(1)} MB` : null,
-    fileUrl: doc.fileUrl,
-    createdAt: doc.createdAt,
-  });
-
-  const fetchApprovedDocuments = async () => {
+  const fetchApprovedDocuments = useCallback(async () => {
     setLoadingDocs(true);
     try {
-      const response = await fetch(`${apiUrl}/documents?status=approved`);
+      const response = await fetch(`${API_URL}/documents?status=approved`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -66,13 +96,14 @@ export default function Home({ onOpenAuth, user }) {
     } finally {
       setLoadingDocs(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    queueMicrotask(() => void fetchApprovedDocuments());
-    // The document loader is intentionally run once on mount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const timerId = window.setTimeout(() => {
+      void fetchApprovedDocuments();
+    }, 0);
+    return () => window.clearTimeout(timerId);
+  }, [fetchApprovedDocuments]);
 
   const handleUploadClick = () => {
     if (!user) {
@@ -95,7 +126,7 @@ export default function Home({ onOpenAuth, user }) {
     if (!doc?.id) return;
 
     try {
-      await fetch(`${apiUrl}/documents/${doc.id}/view`, { method: "POST" });
+      await fetch(`${API_URL}/documents/${doc.id}/view`, { method: "POST" });
     } catch {
       // ignore view counter failure
     }
@@ -104,7 +135,9 @@ export default function Home({ onOpenAuth, user }) {
   };
 
   const handleNewUploadSuccess = (newDoc) => {
-    setDocuments((prev) => [normalizeDocument(newDoc), ...prev]);
+    if (newDoc?.status === "approved") {
+      setDocuments((prev) => [normalizeDocument(newDoc), ...prev]);
+    }
   };
 
   const handleSelectSubjectShowcase = (filterKey) => {
@@ -175,36 +208,75 @@ export default function Home({ onOpenAuth, user }) {
     return unique.size.toLocaleString("vi-VN");
   }, [documents]);
 
+  const platformStats = [
+    {
+      value: totalDocumentsCount,
+      label: "Tài liệu đã duyệt",
+      icon: BookOpen,
+      tone: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
+    },
+    {
+      value: totalDownloadsCount,
+      label: "Lượt tải học tập",
+      icon: Download,
+      tone: "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300",
+    },
+    {
+      value: totalSubjectsCount,
+      label: "Học phần đang có",
+      icon: Layers,
+      tone: "bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300",
+    },
+    {
+      value: "100%",
+      label: "Miễn phí cho sinh viên",
+      icon: CheckCircle2,
+      tone: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+    },
+  ];
+
   // Top Subject Bento categories
   const subjectShowcases = useMemo(
     () => [
       {
         title: "Khoa học máy tính & CNTT",
-        filterKey: "Lập trình C/C++",
+        filterKey: "Mạng máy tính",
         description: "Lập trình C/C++, Cấu trúc dữ liệu, Mạng máy tính",
         icon: Code2,
-        color: "emerald",
+        label: "Công nghệ",
+        surface: "from-emerald-50 to-teal-50/30 dark:from-emerald-500/10 dark:to-teal-500/5",
+        iconTone: "bg-emerald-600 text-white shadow-emerald-600/20",
+        accent: "text-emerald-700 dark:text-emerald-300",
       },
       {
         title: "Toán & Khoa học cơ bản",
         filterKey: "Giải tích",
         description: "Giải tích 1-2-3, Toán cao cấp, Vật lý đại cương",
         icon: Calculator,
-        color: "blue",
+        label: "Khoa học",
+        surface: "from-blue-50 to-cyan-50/30 dark:from-blue-500/10 dark:to-cyan-500/5",
+        iconTone: "bg-blue-600 text-white shadow-blue-600/20",
+        accent: "text-blue-700 dark:text-blue-300",
       },
       {
         title: "Đại số & Toán ứng dụng",
         filterKey: "Đại số tuyến tính",
         description: "Ma trận, Định thức, Không gian véctơ, Xác suất thống kê",
         icon: TrendingUp,
-        color: "purple",
+        label: "Ứng dụng",
+        surface: "from-violet-50 to-fuchsia-50/30 dark:from-violet-500/10 dark:to-fuchsia-500/5",
+        iconTone: "bg-violet-600 text-white shadow-violet-600/20",
+        accent: "text-violet-700 dark:text-violet-300",
       },
       {
         title: "Lý luận chính trị & Xã hội",
-        filterKey: "Triết học Mác-Lênin",
+        filterKey: "Triết học",
         description: "Triết học Mác-Lênin, Kinh tế chính trị, Pháp luật đại cương",
         icon: Landmark,
-        color: "amber",
+        label: "Đại cương",
+        surface: "from-amber-50 to-orange-50/30 dark:from-amber-500/10 dark:to-orange-500/5",
+        iconTone: "bg-amber-500 text-white shadow-amber-500/20",
+        accent: "text-amber-700 dark:text-amber-300",
       },
     ],
     []
@@ -228,7 +300,7 @@ export default function Home({ onOpenAuth, user }) {
     },
     {
       q: "StudyHub hỗ trợ những định dạng tệp tin nào?",
-      a: "Nền tảng hỗ trợ các định dạng học tập thông dụng hiện nay bao gồm PDF (.pdf), Word (.doc, .docx), và Slide thuyết trình (.ppt, .pptx).",
+      a: "Nền tảng hỗ trợ PDF (.pdf), Word (.docx), PowerPoint (.pptx), Excel (.xlsx) và văn bản (.txt). Tệp được kiểm tra định dạng trước khi chuyển đến quản trị viên kiểm duyệt.",
     },
     {
       q: "Làm thế nào nếu tôi phát hiện tài liệu có nội dung sai lệch hoặc lỗi?",
@@ -237,243 +309,254 @@ export default function Home({ onOpenAuth, user }) {
   ];
 
   return (
-    <div className="space-y-16 max-w-6xl mx-auto text-left pb-12">
-      {/* 1. HERO SECTION */}
-      <section className="text-center py-12 md:py-16 px-6 rounded-3xl bg-gradient-to-b from-emerald-50/70 via-slate-50/40 to-white dark:from-slate-900 dark:via-slate-900/90 dark:to-slate-950 border border-slate-200/80 dark:border-slate-800 shadow-xs relative overflow-hidden space-y-6">
-        {/* Glow decoration */}
-        <div className="absolute top-0 right-1/4 -mt-16 w-80 h-80 rounded-full bg-emerald-500/10 dark:bg-emerald-500/15 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/4 -mb-16 w-80 h-80 rounded-full bg-teal-500/10 dark:bg-teal-500/15 blur-3xl pointer-events-none" />
+    <div className="mx-auto w-full min-w-0 max-w-7xl space-y-20 pb-16 text-left">
+      {/* 1. HERO + LIVE PLATFORM STATS */}
+      <div className="relative pb-10 md:pb-14">
+        <section className="studyhub-hero relative w-full min-w-0 max-w-full overflow-hidden rounded-[2rem] border border-emerald-300/15 bg-[#071b1c] text-white shadow-[0_30px_90px_-35px_rgba(5,150,105,0.55)]">
+          <div className="absolute inset-0 hero-grid opacity-40 pointer-events-none" />
+          <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none" />
+          <div className="absolute left-1/3 bottom-0 h-56 w-56 rounded-full bg-amber-400/10 blur-3xl pointer-events-none" />
 
-        {/* Badge */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 text-xs font-semibold border border-emerald-500/20">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Nền tảng chia sẻ học thuật & đề thi đại học</span>
-        </div>
+          <div className="relative grid min-w-0 items-center lg:grid-cols-[1.03fr_0.97fr]">
+            <div className="min-w-0 px-6 py-10 sm:px-9 md:py-14 lg:px-14 lg:py-16 xl:py-20">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-200">
+                <Sparkles className="h-3.5 w-3.5" />
+                Học liệu được cộng đồng kiểm duyệt
+              </div>
 
-        {/* Title */}
-        <div className="space-y-3 max-w-3xl mx-auto">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.15]">
-            Kho tàng tri thức & đề thi chuẩn cho{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">
-              Sinh viên Việt Nam
-            </span>
-          </h1>
-          <p className="text-sm md:text-base text-slate-600 dark:text-slate-300 max-w-2xl mx-auto leading-relaxed">
-            Tra cứu nhanh đề thi, bài tập lớn, slide bài giảng đã qua kiểm duyệt kỹ lưỡng. Ôn tập hiệu quả, bứt phá điểm số trong kỳ thi.
-          </p>
-        </div>
+              <div className="mt-6 max-w-2xl space-y-5">
+                <h1 className="text-[2rem] font-black leading-[1.03] tracking-[-0.045em] text-white min-[420px]:text-[2.55rem] sm:text-5xl lg:text-[3.65rem] xl:text-[4.15rem]">
+                  Học đúng tài liệu.
+                  <span className="block bg-gradient-to-r from-emerald-300 via-teal-300 to-cyan-300 bg-clip-text text-transparent">
+                    Ôn đúng trọng tâm.
+                  </span>
+                </h1>
+                <p className="max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
+                  Kho đề thi, giáo trình và bài giảng dành cho sinh viên Việt Nam — dễ tìm, xem trước an toàn và hoàn toàn miễn phí.
+                </p>
+              </div>
 
-        {/* Search Bar */}
-        <div className="max-w-2xl mx-auto relative pt-2">
-          <div className="relative flex items-center">
-            <Search className="absolute left-4 w-5 h-5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Tìm kiếm môn học, tên đề thi, giáo trình (ví dụ: Giải tích, C/C++...)"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-28 py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs text-sm text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all placeholder:text-slate-400"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-24 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-              >
-                Xóa
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                const el = document.getElementById("featured");
-                if (el) el.scrollIntoView({ behavior: "smooth" });
-              }}
-              className="absolute right-2 bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer"
-            >
-              Tìm kiếm
-            </button>
-          </div>
-        </div>
-
-        {/* Quick search suggestions */}
-        <div className="flex items-center justify-center gap-2 flex-wrap text-xs text-slate-500 dark:text-slate-400 pt-1">
-          <span className="font-medium">Tìm nhanh theo học phần:</span>
-          {searchSuggestions.map((term) => (
-            <button
-              key={term}
-              type="button"
-              onClick={() => {
-                setSelectedSubject(term);
-                const el = document.getElementById("featured");
-                if (el) el.scrollIntoView({ behavior: "smooth" });
-              }}
-              className="px-2.5 py-1 rounded-lg bg-white/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 hover:border-primary hover:text-primary transition-colors font-medium shadow-2xs cursor-pointer"
-            >
-              {term}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* 2. REAL PLATFORM STATS BAR */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-            <BookOpen className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-              {totalDocumentsCount}
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              Tài liệu đã kiểm duyệt
-            </p>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
-          <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-            <Download className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-2xl md:text-3xl font-black text-blue-600 dark:text-blue-400 tracking-tight">
-              {totalDownloadsCount}
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              Lượt tải về
-            </p>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
-          <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-            <Layers className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-2xl md:text-3xl font-black text-purple-600 dark:text-purple-400 tracking-tight">
-              {totalSubjectsCount}
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              Học phần có tài liệu
-            </p>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-2">
-          <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-2xl md:text-3xl font-black text-amber-600 dark:text-amber-400 tracking-tight">
-              100%
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              Miễn phí tải & chia sẻ
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. BENTO SUBJECT SHOWCASE */}
-      <section className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 border-b border-slate-200/80 dark:border-slate-800 pb-4">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-primary">
-              Khối ngành nổi bật
-            </span>
-            <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              Khám phá theo khối ngành
-            </h2>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
-            Bấm chọn để lọc nhanh danh sách tài liệu tương ứng bên dưới
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {subjectShowcases.map((cat, idx) => {
-            const Icon = cat.icon;
-            const isSelected = selectedSubject === cat.filterKey;
-            const docCount = getSubjectDocCount(cat.filterKey);
-
-            return (
-              <div
-                key={idx}
-                onClick={() => handleSelectSubjectShowcase(cat.filterKey)}
-                className={`group p-5 rounded-3xl border transition-all cursor-pointer space-y-3 relative overflow-hidden flex flex-col justify-between ${
-                  isSelected
-                    ? "border-primary bg-primary/5 dark:bg-primary/10 shadow-md ring-2 ring-primary/20"
-                    : "border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-primary/50 hover:shadow-sm"
-                }`}
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 group-hover:bg-primary group-hover:text-white transition-colors flex items-center justify-center">
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                      {docCount} tài liệu
-                    </span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <h3 className="text-sm md:text-base font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">
-                      {cat.title}
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-                      {cat.description}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-2 flex items-center text-xs font-semibold text-primary gap-1 group-hover:translate-x-1 transition-transform">
-                  <span>Lọc tài liệu</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+              <div className="mt-7 max-w-xl rounded-2xl border border-white/10 bg-white p-1.5 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.8)]">
+                <div className="relative flex items-center">
+                  <Search className="absolute left-3.5 h-5 w-5 text-slate-400" />
+                  <input
+                    type="text"
+                    aria-label="Tìm kiếm tài liệu"
+                    placeholder="Tìm môn học, đề thi, giáo trình..."
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        document.getElementById("featured")?.scrollIntoView({ behavior: "smooth" });
+                      }
+                    }}
+                    className="h-12 w-full rounded-xl bg-white pl-11 pr-28 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/25"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-[6.8rem] text-[11px] font-semibold text-slate-400 hover:text-slate-700"
+                    >
+                      Xóa
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById("featured")?.scrollIntoView({ behavior: "smooth" })}
+                    className="absolute right-1.5 inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 text-xs font-bold text-white transition hover:bg-emerald-500 active:scale-95"
+                  >
+                    Tìm ngay <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                <span className="font-semibold text-slate-300">Tìm nhanh:</span>
+                {searchSuggestions.map((term) => (
+                  <button
+                    key={term}
+                    type="button"
+                    onClick={() => {
+                      setSelectedSubject(term);
+                      document.getElementById("featured")?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 transition hover:border-emerald-300/40 hover:bg-emerald-300/10 hover:text-emerald-200"
+                  >
+                    {term}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-slate-300">
+                <span className="inline-flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4 text-emerald-300" /> Xem trước an toàn
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Users2 className="h-4 w-4 text-cyan-300" /> Chia sẻ bởi sinh viên
+                </span>
+              </div>
+            </div>
+
+            <div className="relative min-w-0 px-5 pb-7 sm:px-8 lg:px-3 lg:pb-0 lg:pr-7">
+              <div className="hero-float relative overflow-hidden rounded-[1.65rem] border border-white/15 bg-slate-900 shadow-2xl">
+                <img
+                  src={heroVisual}
+                  alt="Không gian học tập số với sách, máy tính và tài liệu đã kiểm duyệt"
+                  className="aspect-[3/2] h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/45 via-transparent to-white/5" />
+                <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-slate-950/60 px-3 py-1.5 text-[10px] font-bold text-white backdrop-blur-md">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]" />
+                  StudyHub Learning Space
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white backdrop-blur-sm">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-400/15 text-emerald-300">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-extrabold">Nội dung đáng tin cậy</p>
+                  <p className="text-[10px] text-slate-400">Kiểm duyệt trước khi công khai</p>
+                </div>
+                <span className="ml-auto hidden rounded-full border border-emerald-300/15 bg-emerald-300/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-200 sm:inline-flex">
+                  Đã xác minh
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="relative z-20 mx-3 -mt-5 grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_24px_70px_-35px_rgba(15,23,42,0.5)] dark:border-slate-800 dark:bg-slate-900 md:mx-10 md:-mt-8 md:grid-cols-4 md:rounded-3xl">
+          {platformStats.map((stat, index) => {
+            const Icon = stat.icon;
+            return (
+              <div
+                key={stat.label}
+                className={`flex items-center gap-3 px-4 py-4 sm:px-5 md:py-5 ${
+                  index % 2 === 0 ? "border-r border-slate-100 dark:border-slate-800" : ""
+                } ${index < 2 ? "border-b border-slate-100 dark:border-slate-800 md:border-b-0" : ""} ${
+                  index > 0 ? "md:border-l md:border-slate-100 md:dark:border-slate-800" : ""
+                }`}
+              >
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${stat.tone}`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xl font-black tracking-tight text-slate-950 dark:text-white md:text-2xl">{stat.value}</p>
+                  <p className="truncate text-[10px] font-semibold text-slate-500 dark:text-slate-400 sm:text-xs">{stat.label}</p>
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      </div>
+
+      {/* 3. SUBJECT SHOWCASE */}
+      <section id="subjects" className="scroll-mt-28 space-y-7">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div className="max-w-2xl">
+            <span className="inline-flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+              <span className="h-px w-7 bg-emerald-500" /> Khối ngành nổi bật
+            </span>
+            <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-950 dark:text-white md:text-3xl">
+              Bắt đầu từ môn bạn đang học
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+              Đi thẳng tới nhóm tài liệu phù hợp, từ bài giảng nền tảng đến đề ôn tập chuyên sâu.
+            </p>
+          </div>
+          <a
+            href="#featured"
+            className="inline-flex items-center gap-1.5 self-start text-xs font-extrabold text-emerald-700 transition hover:gap-2.5 dark:text-emerald-300 sm:self-auto"
+          >
+            Xem toàn bộ tài liệu <ArrowUpRight className="h-4 w-4" />
+          </a>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {subjectShowcases.map((category, index) => {
+            const Icon = category.icon;
+            const isSelected = selectedSubject === category.filterKey;
+            const docCount = getSubjectDocCount(category.filterKey);
+
+            return (
+              <button
+                type="button"
+                key={category.filterKey}
+                onClick={() => handleSelectSubjectShowcase(category.filterKey)}
+                className={`group relative min-h-56 overflow-hidden rounded-[1.55rem] border bg-gradient-to-br p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_45px_-30px_rgba(15,23,42,0.55)] ${category.surface} ${
+                  isSelected
+                    ? "border-emerald-500 ring-2 ring-emerald-500/20"
+                    : "border-slate-200/80 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700"
+                }`}
+              >
+                <span className="absolute right-4 top-3 text-5xl font-black tracking-tighter text-slate-900/[0.035] dark:text-white/[0.035]">
+                  0{index + 1}
+                </span>
+
+                <span className={`flex h-11 w-11 items-center justify-center rounded-2xl shadow-lg ${category.iconTone}`}>
+                  <Icon className="h-5 w-5" />
+                </span>
+
+                <span className={`mt-6 block text-[10px] font-extrabold uppercase tracking-[0.16em] ${category.accent}`}>
+                  {category.label} · {docCount} tài liệu
+                </span>
+                <h3 className="mt-2 text-base font-extrabold leading-6 text-slate-950 dark:text-white">
+                  {category.title}
+                </h3>
+                <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  {category.description}
+                </p>
+
+                <span className={`absolute bottom-5 right-5 flex h-8 w-8 items-center justify-center rounded-full border border-current/10 bg-white/70 transition group-hover:translate-x-0.5 dark:bg-slate-950/40 ${category.accent}`}>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </span>
+              </button>
             );
           })}
         </div>
       </section>
 
       {/* 4. DOCUMENTS CATALOG WITH SORTING TABS */}
-      <section id="featured" className="space-y-6">
-        {/* Horizontal Subject Pill Bar */}
-        <div className="space-y-3">
-          <SubjectFilter
-            subjects={subjects}
-            selectedSubject={selectedSubject}
-            onSelectSubject={setSelectedSubject}
-          />
+      <section id="featured" className="scroll-mt-28 space-y-6">
+        <div className="max-w-2xl">
+          <span className="inline-flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+            <span className="h-px w-7 bg-emerald-500" /> Thư viện học liệu
+          </span>
+          <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-950 dark:text-white md:text-3xl">
+            Tài liệu dành cho kỳ học này
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+            Mỗi nội dung công khai đều đã qua hàng đợi kiểm duyệt của StudyHub.
+          </p>
         </div>
 
-        {/* Section Header with Sort Tabs & Count */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                Tài liệu học tập
-              </h2>
-              {selectedSubject && selectedSubject !== "Tất cả" && (
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                  {selectedSubject}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Hiển thị {filteredAndSortedDocs.length} tài liệu đã kiểm duyệt sẵn sàng tải về
-            </p>
+        <SubjectFilter
+          subjects={subjects}
+          selectedSubject={selectedSubject}
+          onSelectSubject={setSelectedSubject}
+        />
+
+        <div className="flex flex-col justify-between gap-4 border-b border-slate-200/80 pb-4 dark:border-slate-800 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            <span>
+              <strong className="font-extrabold text-slate-900 dark:text-white">{filteredAndSortedDocs.length}</strong>{" "}
+              tài liệu phù hợp
+              {selectedSubject && selectedSubject !== "Tất cả" ? ` với “${selectedSubject}”` : ""}
+            </span>
           </div>
 
           {/* Sorting Tabs */}
-          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-semibold self-start sm:self-auto">
+          <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-slate-100 p-1 text-xs font-semibold dark:border-slate-700 dark:bg-slate-800/80 sm:self-auto">
             <button
               type="button"
               onClick={() => setSortBy("latest")}
               className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 sortBy === "latest"
-                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs"
+                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
@@ -484,7 +567,7 @@ export default function Home({ onOpenAuth, user }) {
               onClick={() => setSortBy("popular")}
               className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 sortBy === "popular"
-                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs"
+                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
@@ -495,7 +578,7 @@ export default function Home({ onOpenAuth, user }) {
               onClick={() => setSortBy("rating")}
               className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 sortBy === "rating"
-                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs"
+                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
@@ -563,56 +646,38 @@ export default function Home({ onOpenAuth, user }) {
         )}
       </section>
 
-      {/* 5. HOW IT WORKS (3 STEPS) */}
-      <section className="p-8 md:p-12 rounded-3xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800 space-y-8">
-        <div className="text-center max-w-2xl mx-auto space-y-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-primary">
-            Đơn giản & Tiện lợi
+      {/* 5. HOW IT WORKS */}
+      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white px-6 py-10 shadow-[0_22px_60px_-45px_rgba(15,23,42,0.65)] dark:border-slate-800 dark:bg-slate-900 md:px-10 md:py-12">
+        <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-emerald-400/10 blur-3xl" />
+        <div className="relative mx-auto max-w-2xl text-center">
+          <span className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+            Một hành trình liền mạch
           </span>
-          <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            StudyHub hoạt động như thế nào?
+          <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-950 dark:text-white md:text-3xl">
+            Từ câu hỏi đến tài liệu chỉ trong vài bước
           </h2>
-          <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400">
-            Trải nghiệm chia sẻ tài liệu học tập văn minh, an toàn và hoàn toàn miễn phí
+          <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+            Quy trình rõ ràng giúp sinh viên tìm, kiểm tra và chia sẻ học liệu thuận tiện hơn.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 shadow-xs space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-base">
-              1
-            </div>
-            <h3 className="font-bold text-base text-slate-900 dark:text-white">
-              Khám phá & Tìm kiếm
-            </h3>
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Dễ dàng tra cứu đề thi, bài tập và giáo trình theo tên học phần và các bộ lọc thông minh.
-            </p>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 shadow-xs space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-base">
-              2
-            </div>
-            <h3 className="font-bold text-base text-slate-900 dark:text-white">
-              Xem trước & Tải an toàn
-            </h3>
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Xem trước trực tiếp tài liệu PDF trực tuyến, kiểm tra đánh giá trước khi tải về máy nhanh chóng.
-            </p>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 shadow-xs space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-base">
-              3
-            </div>
-            <h3 className="font-bold text-base text-slate-900 dark:text-white">
-              Chia sẻ & Lan tỏa
-            </h3>
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Đóng góp tài liệu học tập của bạn lên hệ thống để cùng xây dựng cộng đồng sinh viên vững mạnh.
-            </p>
-          </div>
+        <div className="relative mt-9 grid gap-4 md:grid-cols-3 md:gap-6">
+          <div className="absolute left-[16.66%] right-[16.66%] top-7 hidden border-t border-dashed border-slate-300 dark:border-slate-700 md:block" />
+          {studyJourney.map((item) => {
+            const Icon = item.icon;
+            return (
+              <article key={item.step} className="relative rounded-2xl border border-slate-200/70 bg-slate-50/70 p-5 dark:border-slate-800 dark:bg-slate-950/45">
+                <div className="flex items-center justify-between">
+                  <span className={`relative z-10 flex h-14 w-14 items-center justify-center rounded-2xl shadow-lg ${item.tone}`}>
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span className="text-3xl font-black text-slate-200 dark:text-slate-700">{item.step}</span>
+                </div>
+                <h3 className="mt-5 text-base font-extrabold text-slate-950 dark:text-white">{item.title}</h3>
+                <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">{item.description}</p>
+              </article>
+            );
+          })}
         </div>
       </section>
 
@@ -667,29 +732,37 @@ export default function Home({ onOpenAuth, user }) {
       </section>
 
       {/* 7. UPLOAD CTA BANNER */}
-      <section className="p-8 md:p-10 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950 text-white border border-slate-800 shadow-md relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8">
-        <div className="absolute right-0 bottom-0 -mr-16 -mb-16 w-64 h-64 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
-
-        <div className="space-y-3 text-center md:text-left relative z-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs font-semibold text-emerald-300 border border-white/10">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Thư viện tri thức mở StudyHub</span>
+      <section className="studyhub-cta relative overflow-hidden rounded-[2rem] border border-emerald-300/15 bg-[#071b1c] px-6 py-9 text-white shadow-[0_28px_70px_-38px_rgba(5,150,105,0.75)] sm:px-9 md:px-12 md:py-11">
+        <div className="hero-grid absolute inset-0 opacity-30" />
+        <div className="absolute -right-16 -top-24 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
+        <div className="relative grid items-center gap-8 md:grid-cols-[1fr_auto]">
+          <div className="max-w-2xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-200">
+              <Sparkles className="h-3.5 w-3.5" /> Cùng xây thư viện học liệu mở
+            </div>
+            <h3 className="mt-4 text-2xl font-black tracking-[-0.03em] sm:text-3xl">
+              Một tài liệu của bạn có thể giúp cả lớp học tốt hơn.
+            </h3>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">
+              Đăng đề thi, bài giảng hoặc giáo trình. StudyHub sẽ kiểm tra tệp và gửi đến quản trị viên trước khi công khai.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-4 text-[11px] font-semibold text-slate-300">
+              <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" /> Miễn phí</span>
+              <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-emerald-300" /> Có kiểm duyệt</span>
+              <span className="inline-flex items-center gap-1.5"><Users2 className="h-3.5 w-3.5 text-emerald-300" /> Vì cộng đồng</span>
+            </div>
           </div>
-          <h3 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-            Bạn có đề thi hoặc tài liệu học phần hay?
-          </h3>
-          <p className="text-slate-300 text-xs md:text-sm max-w-xl leading-relaxed">
-            Mỗi tài liệu bạn đóng góp sẽ giúp các bạn sinh viên khác ôn tập thuận tiện hơn. Đăng tải nhanh chỉ trong 30 giây!
-          </p>
-        </div>
 
-        <button
-          onClick={handleUploadClick}
-          className="relative z-10 bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-3.5 rounded-2xl font-bold text-sm shadow-md transition-all active:scale-95 flex items-center gap-2 shrink-0 cursor-pointer"
-        >
-          <UploadCloud className="w-4 h-4" />
-          <span>Đăng tải tài liệu ngay</span>
-        </button>
+          <button
+            type="button"
+            onClick={handleUploadClick}
+            className="group inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-6 py-4 text-sm font-extrabold text-emerald-950 shadow-[0_18px_38px_-18px_rgba(52,211,153,0.9)] transition hover:bg-emerald-300 active:scale-95 md:w-auto"
+          >
+            <UploadCloud className="h-4 w-4" />
+            Đăng tài liệu ngay
+            <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </button>
+        </div>
       </section>
 
       {/* Modals */}

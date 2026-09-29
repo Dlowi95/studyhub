@@ -5,6 +5,7 @@ const Document = require("../models/Document");
 const Review = require("../models/review");
 const Report = require("../models/report");
 const { deleteDocumentPhysicalFile } = require("../utils/fileCleanup");
+const { validateDocumentFile } = require("../utils/documentFileValidation");
 
 const uploadDir = path.join(__dirname, "..", "uploads");
 
@@ -45,6 +46,11 @@ exports.uploadDocument = async (req, res) => {
       });
     }
 
+    const fileValidation = validateDocumentFile(req.file);
+    if (!fileValidation.valid) {
+      return res.status(400).json({ message: fileValidation.message });
+    }
+
     let fileUrl = "";
 
     if (cloudinary.isConfigured) {
@@ -54,7 +60,7 @@ exports.uploadDocument = async (req, res) => {
             {
               resource_type: "raw",
               folder: "studyhub/documents",
-              public_id: `${Date.now()}-${sanitizeFileName(req.file.originalname)}`,
+              public_id: `${Date.now()}-${sanitizeFileName(req.file.originalname).replace(/\.[^/.]+$/, "")}`,
             },
             (error, uploadResult) => {
               if (error) reject(error);
@@ -79,7 +85,7 @@ exports.uploadDocument = async (req, res) => {
       description: description || "",
       fileUrl,
       fileName: req.file.originalname,
-      fileType: req.body.fileType || req.file.mimetype || "FILE",
+      fileType: fileValidation.fileType,
       fileSize: req.file.size || 0,
       subjectId: subjectId || null,
       subjectName: subjectName || "Khác",

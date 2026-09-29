@@ -15,7 +15,7 @@ const authenticateToken = async (req, res, next) => {
     // Fetch user from DB to verify status (active/blocked)
     const user = await User.findById(decoded.id);
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(401).json({ message: "User not found or account removed" });
     }
 
     if (user.status === "blocked") {
@@ -25,7 +25,7 @@ const authenticateToken = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    return res.status(403).json({ message: "Invalid or expired token", error: error.message });
+    return res.status(401).json({ message: "Invalid or expired token", error: error.message });
   }
 };
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Table,
@@ -81,11 +81,14 @@ import {
   X,
   UserCog,
   Shield,
-  ShieldCheck,
   ShieldAlert,
   Check,
   BarChart3,
   RotateCcw,
+  Plus,
+  Loader2,
+  ShieldCheck,
+  FileText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -276,7 +279,34 @@ function SidebarNav({
   );
 }
 
-const PAGE_LOAD_TIME = Date.now();
+const officeFileExtensions = new Set(["doc", "docx", "ppt", "pptx", "xls", "xlsx"]);
+
+const getAuthHeaders = () => {
+  const token = localStorage.getItem("token");
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+};
+
+const getDocumentExtension = (doc = {}) => {
+  const fileNameMatch = String(doc.fileName || "").toLowerCase().match(/\.([a-z0-9]+)$/);
+  if (fileNameMatch) return fileNameMatch[1];
+
+  const urlMatch = String(doc.fileUrl || "").toLowerCase().split("?")[0].match(/\.([a-z0-9]+)$/);
+  if (urlMatch) return urlMatch[1];
+
+  const fileType = String(doc.fileType || "").toLowerCase();
+  if (fileType.includes("pdf")) return "pdf";
+  if (fileType.includes("text") || fileType === "txt") return "txt";
+  if (fileType.includes("wordprocessing") || fileType === "docx") return "docx";
+  if (fileType.includes("msword") || fileType === "doc") return "doc";
+  if (fileType.includes("presentation") || fileType === "pptx") return "pptx";
+  if (fileType.includes("powerpoint") || fileType === "ppt") return "ppt";
+  if (fileType.includes("spreadsheet") || fileType === "xlsx") return "xlsx";
+  if (fileType.includes("excel") || fileType === "xls") return "xls";
+  return "";
+};
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview"); // "overview" | "users" | "documents" | "subjects" | "pending" | "reports"
@@ -288,7 +318,15 @@ export default function AdminDashboard() {
   const [reports, setReports] = useState([]);
 
   const [loading, setLoading] = useState(false);
-  const [currentAdmin, setCurrentAdmin] = useState(null);
+  const [currentAdmin] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch (error) {
+      console.error(error);
+      return null;
+    }
+  });
+  const [dashboardLoadedAt] = useState(() => Date.now());
   const [searchQuery, setSearchQuery] = useState("");
   const [docFilterStatus, setDocFilterStatus] = useState("all");
   const [lastUpdated, setLastUpdated] = useState("");
@@ -318,33 +356,43 @@ export default function AdminDashboard() {
   const [reportActionType, setReportActionType] = useState("resolve_reject"); // "resolve_reject" | "resolve_delete" | "dismiss"
   const [reportFeedbackText, setReportFeedbackText] = useState("");
 
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewDocument, setPreviewDocument] = useState(null);
+  const [previewMode, setPreviewMode] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewText, setPreviewText] = useState("");
+  const [extractedPreview, setExtractedPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  const previewAbortRef = useRef(null);
+
+  const [subjectModalOpen, setSubjectModalOpen] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState("");
+  const [newSubjectCode, setNewSubjectCode] = useState("");
+  const [subjectSaving, setSubjectSaving] = useState(false);
+  const [subjectError, setSubjectError] = useState("");
+
   const { toast } = useToast();
   const navigate = useNavigate();
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-
   const isModerator = currentAdmin?.role === "moderator";
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("token");
-    return {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    };
-  };
-
-  const updateTimestamp = () => {
+  const fetchData = useCallback(async () => {
+    setLoading(true);
     const now = new Date();
     setLastUpdated(
       now.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
     );
-  };
-
-  const fetchData = async () => {
-    setLoading(true);
-    updateTimestamp();
     try {
       // 1. Fetch real documents from MongoDB
       const docsRes = await fetch(`${apiUrl}/admin/documents`, { headers: getAuthHeaders() });
+      if (docsRes.status === 401 || docsRes.status === 403) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        alert("Phiên đăng nhập đã hết hạn hoặc tài khoản không có quyền Quản trị viên. Vui lòng đăng nhập lại!");
+        window.location.href = "/";
+        return;
+      }
       if (docsRes.ok) {
         const docsData = await docsRes.json();
         const docsList = Array.isArray(docsData) ? docsData : [];
@@ -379,7 +427,22 @@ export default function AdminDashboard() {
         );
       }
 
-      // 4. Fetch reports submitted by users
+      // 4. Fetch managed subjects, including subjects that do not have documents yet
+      const subjectsRes = await fetch(`${apiUrl}/admin/subjects`, { headers: getAuthHeaders() });
+      if (subjectsRes.ok) {
+        const subjectsData = await subjectsRes.json();
+        const subjectList = Array.isArray(subjectsData.subjects) ? subjectsData.subjects : [];
+        const maxCount = Math.max(...subjectList.map((subject) => subject.count || 0), 1);
+        setSubjects(
+          subjectList.map((subject) => ({
+            ...subject,
+            id: subject.id || subject._id || subject.name,
+            percentage: Math.round(((subject.count || 0) / maxCount) * 100),
+          }))
+        );
+      }
+
+      // 5. Fetch reports submitted by users
       const reportsRes = await fetch(`${apiUrl}/reports`, { headers: getAuthHeaders() });
       if (reportsRes.ok) {
         const reportsData = await reportsRes.json();
@@ -390,23 +453,22 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiUrl]);
 
   useEffect(() => {
-    const adminStr = localStorage.getItem("user");
-    queueMicrotask(() => {
-      if (adminStr) {
-        try {
-          setCurrentAdmin(JSON.parse(adminStr));
-        } catch (error) {
-          console.error(error);
-        }
-      }
+    const timerId = window.setTimeout(() => {
       void fetchData();
-    });
-    // fetchData is intentionally run once when the dashboard mounts.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    }, 0);
+    return () => window.clearTimeout(timerId);
+  }, [fetchData]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  useEffect(() => () => previewAbortRef.current?.abort(), []);
 
   // --- Document Approvals & Rejections ---
   const handleApproveDoc = async (docId) => {
@@ -514,6 +576,135 @@ export default function AdminDashboard() {
         title: "Lỗi",
         description: err.message,
       });
+    }
+  };
+
+  const closeDocumentPreview = () => {
+    previewAbortRef.current?.abort();
+    previewAbortRef.current = null;
+    setPreviewModalOpen(false);
+    setPreviewDocument(null);
+    setPreviewMode("");
+    setPreviewUrl("");
+    setPreviewText("");
+    setExtractedPreview(null);
+    setPreviewLoading(false);
+    setPreviewError("");
+  };
+
+  const handleOpenPreview = async (doc) => {
+    if (!doc?.fileUrl) return;
+
+    previewAbortRef.current?.abort();
+    const controller = new AbortController();
+    previewAbortRef.current = controller;
+
+    setPreviewDocument(doc);
+    setPreviewModalOpen(true);
+    setPreviewMode("");
+    setPreviewUrl("");
+    setPreviewText("");
+    setExtractedPreview(null);
+    setPreviewError("");
+
+    const extension = getDocumentExtension(doc);
+    const extractableOfficeExtensions = ["docx", "pptx", "xlsx"];
+    if (officeFileExtensions.has(extension) && !extractableOfficeExtensions.includes(extension)) {
+      try {
+        const sourceUrl = new URL(doc.fileUrl, window.location.href);
+        const isLocalSource = ["localhost", "127.0.0.1", "::1"].includes(sourceUrl.hostname);
+        if (sourceUrl.protocol !== "https:" || isLocalSource) {
+          throw new Error(
+            "Tệp Office đang lưu trên máy chủ nội bộ nên dịch vụ xem trực tuyến chưa thể truy cập. Hãy cấu hình Cloudinary cho môi trường này."
+          );
+        }
+        setPreviewMode("office");
+        setPreviewUrl(
+          `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(sourceUrl.href)}`
+        );
+      } catch (error) {
+        setPreviewError(error.message || "Không thể tạo bản xem trước Office");
+      }
+      return;
+    }
+
+    if (!["pdf", "txt", ...extractableOfficeExtensions].includes(extension)) {
+      setPreviewError("Định dạng tệp này chưa hỗ trợ xem trước an toàn trong trình duyệt.");
+      return;
+    }
+
+    setPreviewLoading(true);
+    try {
+      const documentId = doc._id || doc.id;
+      const response = await fetch(`${apiUrl}/admin/documents/${documentId}/preview`, {
+        headers: getAuthHeaders(),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "Không thể tạo bản xem trước");
+      }
+
+      if (extractableOfficeExtensions.includes(extension)) {
+        setExtractedPreview(await response.json());
+        setPreviewMode("extracted");
+      } else if (extension === "txt") {
+        setPreviewText(await response.text());
+        setPreviewMode("text");
+      } else {
+        const sourceBlob = await response.blob();
+        const objectUrl = URL.createObjectURL(
+          new Blob([sourceBlob], { type: "application/pdf" })
+        );
+        setPreviewUrl(objectUrl);
+        setPreviewMode("pdf");
+      }
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        setPreviewError(error.message || "Không thể tạo bản xem trước");
+      }
+    } finally {
+      if (!controller.signal.aborted) setPreviewLoading(false);
+    }
+  };
+
+  const handleOpenSubjectModal = () => {
+    setNewSubjectName("");
+    setNewSubjectCode("");
+    setSubjectError("");
+    setSubjectModalOpen(true);
+  };
+
+  const handleCreateSubject = async (event) => {
+    event.preventDefault();
+    const name = newSubjectName.trim();
+    if (name.length < 2) {
+      setSubjectError("Tên học phần phải có ít nhất 2 ký tự.");
+      return;
+    }
+
+    setSubjectSaving(true);
+    setSubjectError("");
+    try {
+      const response = await fetch(`${apiUrl}/admin/subjects`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ name, code: newSubjectCode.trim() }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.message || "Không thể thêm học phần");
+      }
+
+      setSubjectModalOpen(false);
+      setNewSubjectName("");
+      setNewSubjectCode("");
+      await fetchData();
+    } catch (error) {
+      setSubjectError(error.message || "Không thể thêm học phần");
+    } finally {
+      setSubjectSaving(false);
     }
   };
 
@@ -805,7 +996,7 @@ export default function AdminDashboard() {
   const rejectedDocsCount = allDocs.filter((d) => d.status === "rejected").length;
   const recentUsersCount = users.filter((user) => {
     const createdAt = new Date(user.createdAt).getTime();
-    return createdAt >= PAGE_LOAD_TIME - 30 * 24 * 60 * 60 * 1000;
+    return createdAt >= dashboardLoadedAt - 30 * 24 * 60 * 60 * 1000;
   }).length;
 
   const activityChartData = (documentStats?.monthlyUploads || []).map((item) => ({
@@ -1737,11 +1928,15 @@ export default function AdminDashboard() {
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
                                 {doc.fileUrl && (
-                                  <a href={doc.fileUrl} target="_blank" rel="noreferrer">
-                                    <Button size="sm" variant="outline" className="h-7 px-2 border-zinc-800 text-zinc-300 rounded-lg cursor-pointer">
-                                      <Eye className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </a>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleOpenPreview(doc)}
+                                    title="Xem trước an toàn"
+                                    className="h-7 px-2 border-zinc-800 text-zinc-300 rounded-lg"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </Button>
                                 )}
                                 {!isModerator && (
                                   <Button
@@ -1770,16 +1965,35 @@ export default function AdminDashboard() {
             <Card className="bg-[#12131a] border-zinc-800/80 text-zinc-100 rounded-2xl shadow-xs overflow-hidden p-5 space-y-4">
               <div className="flex items-center justify-between border-b border-zinc-800/60 pb-4">
                 <div>
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <GraduationCap className="w-4 h-4 text-emerald-400" />
-                    <span>Danh mục học phần ({subjects.length})</span>
-                  </h3>
-                  <p className="text-xs text-zinc-400">Học phần và số lượng tài liệu tham khảo tương ứng</p>
+                  <h3 className="text-base font-bold text-white">Danh mục học phần ({subjects.length})</h3>
+                  <p className="text-xs text-zinc-400">Học phần dùng khi thành viên phân loại tài liệu tải lên</p>
                 </div>
+                {!isModerator && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleOpenSubjectModal}
+                    className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold"
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1.5" />
+                    Thêm học phần
+                  </Button>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {subjects.map((sub) => (
+              {subjects.length === 0 ? (
+                <div className="py-14 text-center rounded-xl border border-dashed border-zinc-800 bg-zinc-900/30">
+                  <GraduationCap className="w-9 h-9 mx-auto text-zinc-600 mb-2" />
+                  <p className="text-sm font-semibold text-zinc-300">Chưa có học phần</p>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    {isModerator
+                      ? "Quản trị viên chưa tạo học phần nào."
+                      : "Nhấn “Thêm học phần” để tạo danh mục đầu tiên."}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {subjects.map((sub) => (
                   <div
                     key={sub.id}
                     className="p-4 rounded-xl bg-zinc-900/80 border border-zinc-800/80 flex flex-col justify-between gap-3 hover:border-emerald-500/40 transition-colors"
@@ -1794,8 +2008,9 @@ export default function AdminDashboard() {
                       <p className="text-[11px] text-zinc-400">{sub.count} tài liệu học tập</p>
                     </div>
                   </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </Card>
           )}
 
@@ -1857,11 +2072,15 @@ export default function AdminDashboard() {
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
                                 {doc.fileUrl && (
-                                  <a href={doc.fileUrl} target="_blank" rel="noreferrer">
-                                    <Button size="sm" variant="outline" className="h-8 px-2.5 border-zinc-800 text-zinc-300 hover:bg-zinc-800 rounded-lg cursor-pointer">
-                                      <Eye className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </a>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleOpenPreview(doc)}
+                                    title="Xem trước an toàn"
+                                    className="h-8 px-2.5 border-zinc-800 text-zinc-300 hover:bg-zinc-800 rounded-lg"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </Button>
                                 )}
                                 <Button
                                   size="sm"
@@ -2091,7 +2310,224 @@ export default function AdminDashboard() {
         </main>
       </div>
 
-      {/* ================= DIALOG 1: REJECT DOCUMENT MODAL ================= */}
+      {/* Safe document preview */}
+      <Dialog
+        open={previewModalOpen}
+        onOpenChange={(open) => {
+          if (!open) closeDocumentPreview();
+        }}
+      >
+        <DialogContent className="w-[96vw] max-w-6xl h-[90vh] p-0 gap-0 overflow-hidden rounded-2xl bg-[#101116] border-zinc-800 text-zinc-100 shadow-2xl flex flex-col">
+          <DialogHeader className="px-6 py-4 pr-12 border-b border-zinc-800 bg-[#14151c] shrink-0">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <DialogTitle className="text-base font-bold text-white truncate">
+                  {previewDocument?.title || "Xem trước tài liệu"}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-zinc-400 mt-1 flex flex-wrap items-center gap-2">
+                  <span>{previewDocument?.fileName || "Tệp tài liệu"}</span>
+                  <span className="text-zinc-700">•</span>
+                  <span>{previewDocument?.subjectName || "Chưa phân loại"}</span>
+                </DialogDescription>
+              </div>
+              <Badge variant="outline" className="shrink-0 bg-emerald-500/10 text-emerald-300 border-emerald-500/30 text-[10px]">
+                <ShieldCheck className="w-3 h-3 mr-1" />
+                Xem trước, không tự tải xuống
+              </Badge>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 min-h-0 bg-zinc-950/70 p-3">
+            {previewLoading && (
+              <div className="h-full flex flex-col items-center justify-center gap-3 text-zinc-400">
+                <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
+                <p className="text-xs">Đang chuẩn bị bản xem trước an toàn...</p>
+              </div>
+            )}
+
+            {!previewLoading && previewError && (
+              <div className="h-full flex items-center justify-center px-6">
+                <div className="max-w-lg text-center p-6 rounded-2xl border border-amber-500/20 bg-amber-500/5">
+                  <FileText className="w-10 h-10 mx-auto text-amber-400 mb-3" />
+                  <p className="text-sm font-bold text-white">Chưa thể hiển thị bản xem trước</p>
+                  <p className="text-xs leading-relaxed text-zinc-400 mt-2">{previewError}</p>
+                </div>
+              </div>
+            )}
+
+            {!previewLoading && !previewError && previewMode === "pdf" && previewUrl && (
+              <iframe
+                src={previewUrl}
+                title={`Bản xem trước ${previewDocument?.title || "tài liệu PDF"}`}
+                className="w-full h-full rounded-xl border border-zinc-800 bg-white"
+              />
+            )}
+
+            {!previewLoading && !previewError && previewMode === "office" && previewUrl && (
+              <iframe
+                src={previewUrl}
+                title={`Bản xem trước ${previewDocument?.title || "tài liệu Office"}`}
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                referrerPolicy="no-referrer"
+                className="w-full h-full rounded-xl border border-zinc-800 bg-white"
+              />
+            )}
+
+            {!previewLoading && !previewError && previewMode === "extracted" && extractedPreview && (
+              <div className="w-full h-full overflow-auto rounded-xl border border-zinc-800 bg-zinc-100 p-4 sm:p-6">
+                <div className="max-w-4xl mx-auto space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900">
+                    <div className="flex items-start gap-2.5">
+                      <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-emerald-700" />
+                      <p className="text-xs leading-relaxed">{extractedPreview.notice}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {extractedPreview.imageCount > 0 && (
+                        <Badge variant="outline" className="bg-white text-amber-700 border-amber-200 text-[10px]">
+                          {(extractedPreview.images || []).length}/{extractedPreview.imageCount} ảnh hiển thị
+                        </Badge>
+                      )}
+                      {extractedPreview.truncated && (
+                        <Badge variant="outline" className="bg-white text-zinc-600 border-zinc-300 text-[10px]">
+                          Nội dung đã rút gọn
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  {(extractedPreview.sections || []).map((section, index) => (
+                    <section key={`${section.title}-${index}`} className="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
+                      <h3 className="px-4 py-2.5 border-b border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-700">
+                        {section.title}
+                      </h3>
+                      <pre className="whitespace-pre-wrap break-words p-4 text-sm leading-6 text-zinc-900 font-sans">
+                        {section.content}
+                      </pre>
+                    </section>
+                  ))}
+
+                  {(extractedPreview.images || []).length > 0 && (
+                    <section className="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
+                      <h3 className="px-4 py-2.5 border-b border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-700">
+                        Hình ảnh trong tài liệu
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                        {extractedPreview.images.map((image, index) => (
+                          <figure key={`${image.name}-${index}`} className="rounded-lg border border-zinc-200 bg-zinc-50 p-2">
+                            <img
+                              src={image.dataUrl}
+                              alt={`Ảnh ${index + 1} trong tài liệu`}
+                              loading="lazy"
+                              className="w-full max-h-[520px] object-contain rounded-md bg-white"
+                            />
+                            <figcaption className="px-1 pt-2 text-[10px] text-zinc-500 truncate" title={image.name}>
+                              {image.name}
+                            </figcaption>
+                          </figure>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!previewLoading && !previewError && previewMode === "text" && (
+              <pre className="w-full h-full overflow-auto whitespace-pre-wrap break-words rounded-xl border border-zinc-800 bg-white p-5 text-sm leading-6 text-zinc-900">
+                {previewText}
+              </pre>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create subject modal */}
+      <Dialog
+        open={subjectModalOpen}
+        onOpenChange={(open) => {
+          if (!open && !subjectSaving) setSubjectModalOpen(false);
+        }}
+      >
+        <DialogContent className="sm:max-w-[440px] p-6 rounded-2xl bg-[#141620] border-zinc-800 text-zinc-100 shadow-2xl">
+          <form onSubmit={handleCreateSubject} className="space-y-5">
+            <DialogHeader className="space-y-1">
+              <DialogTitle className="text-base font-bold text-white">Thêm học phần mới</DialogTitle>
+              <DialogDescription className="text-xs text-zinc-400">
+                Học phần mới sẽ xuất hiện trong danh sách phân loại khi tải tài liệu lên.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="subject-name" className="text-xs font-semibold text-zinc-300">
+                  Tên học phần <span className="text-red-400">*</span>
+                </Label>
+                <Input
+                  id="subject-name"
+                  autoFocus
+                  maxLength={120}
+                  value={newSubjectName}
+                  onChange={(event) => setNewSubjectName(event.target.value)}
+                  placeholder="Ví dụ: Kiến trúc máy tính"
+                  className="h-10 text-xs bg-zinc-900 border-zinc-800 text-white rounded-xl"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="subject-code" className="text-xs font-semibold text-zinc-300">
+                  Mã học phần <span className="font-normal text-zinc-500">(tùy chọn)</span>
+                </Label>
+                <Input
+                  id="subject-code"
+                  maxLength={20}
+                  value={newSubjectCode}
+                  onChange={(event) => setNewSubjectCode(event.target.value.toUpperCase())}
+                  placeholder="Ví dụ: IT3020"
+                  className="h-10 text-xs font-mono uppercase bg-zinc-900 border-zinc-800 text-white rounded-xl"
+                />
+              </div>
+
+              {subjectError && (
+                <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-xs text-red-300">
+                  <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{subjectError}</span>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0 pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={subjectSaving}
+                onClick={() => setSubjectModalOpen(false)}
+                className="border-zinc-800 text-zinc-300 hover:bg-zinc-800"
+              >
+                Hủy
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={subjectSaving}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+              >
+                {subjectSaving ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Đang lưu...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-3.5 h-3.5 mr-1.5" /> Thêm học phần
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Modal */}
       <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
         <DialogContent className="sm:max-w-[420px] p-6 rounded-2xl bg-[#141620] border-zinc-800 text-zinc-100 text-left shadow-2xl">
           <DialogHeader className="space-y-1">

@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AuthModal from "./components/AuthModal";
@@ -18,13 +18,12 @@ import {
   Home as HomeIcon,
   BookOpen,
   Sparkles,
+  UserRoundPlus,
 } from "lucide-react";
 import "./App.css";
 
 // Route-based code splitting for maximum performance and faster initial load
 const Home = lazy(() => import("./pages/Home"));
-const Login = lazy(() => import("./pages/Login"));
-const Register = lazy(() => import("./pages/Register"));
 const Profile = lazy(() => import("./pages/Profile"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const UploadDocument = lazy(() => import("./pages/UploadDocument"));
@@ -38,6 +37,18 @@ function PageLoadingFallback() {
       <span className="text-xs font-medium">Đang tải trang...</span>
     </div>
   );
+}
+
+function AuthRedirect({ tab = "login", onOpenAuth }) {
+  useEffect(() => {
+    if (onOpenAuth) {
+      onOpenAuth(tab);
+    } else {
+      window.dispatchEvent(new CustomEvent("openAuthModal", { detail: { tab } }));
+    }
+  }, [tab, onOpenAuth]);
+
+  return <Navigate to="/" replace />;
 }
 
 function MainLayout() {
@@ -61,7 +72,7 @@ function MainLayout() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifOpen, setNotifOpen] = useState(false);
 
-  const fetchNotifications = async (authToken) => {
+  const fetchNotifications = useCallback(async (authToken) => {
     const currentToken = authToken || localStorage.getItem("token");
     if (!currentToken) {
       setNotifications([]);
@@ -81,7 +92,7 @@ function MainLayout() {
     } catch {
       // non-blocking
     }
-  };
+  }, []);
 
   const handleMarkAllAsRead = async () => {
     const currentToken = token || localStorage.getItem("token");
@@ -117,7 +128,7 @@ function MainLayout() {
     setNotifOpen(false);
   };
 
-  const handleStorageChange = async () => {
+  const handleStorageChange = useCallback(async () => {
     const storedToken = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
 
@@ -142,6 +153,11 @@ function MainLayout() {
           const profile = await response.json();
           setUser(profile);
           localStorage.setItem("user", JSON.stringify(profile));
+        } else if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          setToken(null);
+          setUser(null);
         }
       } catch {
         // Keep the cached user when the profile request is unavailable.
@@ -151,10 +167,12 @@ function MainLayout() {
       setNotifications([]);
       setUnreadCount(0);
     }
-  };
+  }, [fetchNotifications]);
 
   useEffect(() => {
-    queueMicrotask(() => void handleStorageChange());
+    const initialSyncTimer = window.setTimeout(() => {
+      void handleStorageChange();
+    }, 0);
 
     window.addEventListener("storage", handleStorageChange);
     window.addEventListener("authChange", handleStorageChange);
@@ -173,14 +191,13 @@ function MainLayout() {
     window.addEventListener("openUploadModal", handleOpenUploadModal);
 
     return () => {
+      window.clearTimeout(initialSyncTimer);
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("authChange", handleStorageChange);
       window.removeEventListener("openAuthModal", handleOpenAuthModal);
       window.removeEventListener("openUploadModal", handleOpenUploadModal);
     };
-    // The storage listeners are registered once for the lifetime of the layout.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [handleStorageChange]);
 
   const openAuth = (tab = "login") => {
     setAuthModalTab(tab);
@@ -222,35 +239,36 @@ function MainLayout() {
 
   // Consumer Portal Layout
   return (
-    <div className="min-h-screen bg-slate-50/60 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
+    <div className="studyhub-page flex min-h-screen min-w-0 flex-col overflow-x-clip bg-slate-50 text-slate-900 transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100">
       {/* Header */}
-      <header className="border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 py-3.5 px-6 sticky top-0 z-40 shadow-xs backdrop-blur-md transition-colors">
-        <div className="container mx-auto flex items-center justify-between">
+      <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/85 px-4 py-3 shadow-[0_8px_30px_-24px_rgba(15,23,42,0.55)] backdrop-blur-xl transition-colors dark:border-slate-800/80 dark:bg-slate-950/80 sm:px-6">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-lg shadow-sm group-hover:opacity-90 transition-opacity">
+          <Link to="/" className="group flex shrink-0 items-center gap-2.5" aria-label="StudyHub - Trang chủ">
+            <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-[0.9rem] bg-gradient-to-br from-emerald-400 to-teal-600 text-lg font-black text-white shadow-[0_10px_24px_-12px_rgba(5,150,105,0.9)] transition-transform group-hover:-rotate-2 group-hover:scale-105">
+              <span className="absolute -right-2 -top-2 h-5 w-5 rounded-full bg-white/20" />
               S
             </div>
-            <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+            <span className="hidden text-xl font-black tracking-[-0.035em] text-slate-950 dark:text-white sm:block">
               Study<span className="text-primary">Hub</span>
             </span>
           </Link>
 
           {/* Center Navigation */}
-          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-300">
-            <Link to="/" className="hover:text-primary dark:hover:text-primary transition-colors">
+          <nav className="hidden items-center gap-1 rounded-full border border-slate-200/80 bg-slate-100/70 p-1 text-xs font-bold text-slate-600 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300 lg:flex">
+            <Link to="/" className="rounded-full bg-white px-3.5 py-2 text-slate-950 shadow-sm transition-colors dark:bg-slate-800 dark:text-white">
               Trang chủ
             </Link>
-            <a href="/#subjects" className="hover:text-primary dark:hover:text-primary transition-colors">
+            <a href="/#subjects" className="rounded-full px-3.5 py-2 transition hover:bg-white hover:text-emerald-700 dark:hover:bg-slate-800 dark:hover:text-emerald-300">
               Học phần
             </a>
-            <a href="/#featured" className="hover:text-primary dark:hover:text-primary transition-colors">
-              Tài liệu nổi bật
+            <a href="/#featured" className="rounded-full px-3.5 py-2 transition hover:bg-white hover:text-emerald-700 dark:hover:bg-slate-800 dark:hover:text-emerald-300">
+              Thư viện
             </a>
             {token && user && (
               <Link
                 to="/my-reports"
-                className="hover:text-primary dark:hover:text-primary transition-colors flex items-center gap-1.5"
+                className="flex items-center gap-1.5 rounded-full px-3.5 py-2 transition hover:bg-white hover:text-amber-700 dark:hover:bg-slate-800 dark:hover:text-amber-300"
               >
                 <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
                 <span>Báo cáo của tôi</span>
@@ -259,11 +277,13 @@ function MainLayout() {
           </nav>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
             {/* Upload Button */}
             <button
+              type="button"
               onClick={handleUploadClick}
-              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl border border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary text-xs md:text-sm font-semibold transition-all shadow-xs active:scale-95 cursor-pointer"
+              aria-label="Đăng tài liệu"
+              className="hidden h-10 items-center gap-2 rounded-xl bg-emerald-600 px-3 text-xs font-extrabold text-white shadow-[0_10px_24px_-14px_rgba(5,150,105,0.9)] transition hover:bg-emerald-500 active:scale-95 sm:flex sm:px-4"
               title="Đăng tài liệu"
             >
               <UploadCloud className="w-4 h-4" />
@@ -277,7 +297,7 @@ function MainLayout() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              className="rounded-xl p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white lg:hidden"
               title="Menu"
               aria-label="Mở menu"
             >
@@ -286,7 +306,7 @@ function MainLayout() {
 
             {/* Logged in */}
             {token && user ? (
-              <div className="flex items-center gap-2.5 pl-1 border-l border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-1.5 border-l border-slate-200 pl-2 dark:border-slate-800 sm:gap-2">
                 {/* Notification Bell (Yêu cầu 4) */}
                 <div className="relative">
                   <button
@@ -395,7 +415,7 @@ function MainLayout() {
                 {(user.role === "admin" || user.role === "moderator") && (
                   <Link
                     to="/admin"
-                    className="hidden sm:flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 transition-colors"
+                    className="hidden items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-500/20 dark:text-amber-400 xl:flex"
                   >
                     <ShieldCheck className="w-3.5 h-3.5" />
                     <span>{user.role === "admin" ? "Admin" : "Moderator"}</span>
@@ -435,7 +455,7 @@ function MainLayout() {
                 <button
                   onClick={handleLogout}
                   title="Đăng xuất"
-                  className="p-2 text-slate-400 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors cursor-pointer"
+                  className="hidden rounded-lg p-2 text-slate-400 transition-colors hover:bg-destructive/10 hover:text-destructive sm:block"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -445,9 +465,11 @@ function MainLayout() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => openAuth("login")}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold shadow-xs transition-all active:scale-95 cursor-pointer"
+                  aria-label="Đăng nhập hoặc tạo tài khoản"
+                  className="flex h-10 items-center gap-1.5 rounded-xl bg-teal-600 px-3 text-xs font-extrabold text-white shadow-sm transition hover:bg-teal-500 active:scale-95 sm:px-4 md:text-sm"
                 >
-                  Tham gia
+                  <UserRoundPlus className="h-4 w-4 sm:hidden" />
+                  <span className="hidden sm:inline">Tham gia</span>
                 </button>
               </div>
             )}
@@ -457,7 +479,7 @@ function MainLayout() {
 
       {/* Mobile Navigation Drawer Sheet */}
       {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
+        <div className="fixed inset-0 z-50 flex lg:hidden">
           {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
@@ -600,12 +622,12 @@ function MainLayout() {
       )}
 
       {/* Main Content */}
-      <main className="container mx-auto py-8 flex-grow px-4">
+      <main className="container mx-auto w-full min-w-0 flex-grow overflow-x-clip px-4 py-6 sm:px-6 md:py-8">
         <Suspense fallback={<PageLoadingFallback />}>
           <Routes>
             <Route path="/" element={<Home onOpenAuth={openAuth} user={user} />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/login" element={<AuthRedirect tab="login" onOpenAuth={openAuth} />} />
+            <Route path="/register" element={<AuthRedirect tab="register" onOpenAuth={openAuth} />} />
             <Route path="/document/:id" element={<DocumentDetailPage />} />
             <Route path="/documents/:id" element={<DocumentDetailPage />} />
             <Route
@@ -637,38 +659,39 @@ function MainLayout() {
         </Suspense>
       </main>
 
-      {/* Rich Footer */}
-      <footer className="border-t border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md pt-12 pb-8 text-xs text-slate-500 dark:text-slate-400 transition-colors">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
+      {/* Footer */}
+      <footer className="relative overflow-hidden border-t border-white/5 bg-[#071316] pb-8 pt-12 text-xs text-slate-400">
+        <div className="absolute -left-32 -top-32 h-80 w-80 rounded-full bg-emerald-500/10 blur-3xl" />
+        <div className="relative container mx-auto px-4 sm:px-6">
+          <div className="mb-10 grid grid-cols-1 gap-8 md:grid-cols-4">
             {/* Col 1: Brand info */}
             <div className="space-y-3 md:col-span-1">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-primary text-primary-foreground flex items-center justify-center font-bold text-base shadow-sm">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 text-base font-black text-white shadow-lg shadow-emerald-950/40">
                   S
                 </div>
-                <span className="font-bold text-lg text-slate-900 dark:text-white tracking-tight">
-                  Study<span className="text-primary">Hub</span>
+                <span className="text-lg font-black tracking-tight text-white">
+                  Study<span className="text-emerald-400">Hub</span>
                 </span>
               </div>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              <p className="text-xs leading-relaxed text-slate-400">
                 Nền tảng chia sẻ và kiểm duyệt đề thi, bài tập lớn, giáo trình chất lượng cao dành cho cộng đồng sinh viên đại học Việt Nam.
               </p>
-              <div className="flex items-center gap-2 pt-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Hệ thống kiểm duyệt hoạt động 24/7</span>
+              <div className="flex items-center gap-2 pt-1 text-[11px] font-semibold text-emerald-300">
+                <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
+                <span>Tài liệu công khai đều qua kiểm duyệt</span>
               </div>
             </div>
 
             {/* Col 2: Học phần phổ biến */}
             <div>
-              <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-3">Học phần nổi bật</h3>
+              <h3 className="mb-3 text-sm font-bold text-white">Học phần nổi bật</h3>
               <ul className="space-y-2">
                 {["Cấu trúc dữ liệu", "Giải tích 1 & 2", "Kinh tế vi mô", "Triết học Mác - Lênin", "Xác suất thống kê", "Cơ sở dữ liệu"].map((item) => (
                   <li key={item}>
-                    <Link to={`/?search=${encodeURIComponent(item)}`} className="hover:text-primary transition-colors">
+                    <a href={`/?search=${encodeURIComponent(item)}#featured`} className="transition-colors hover:text-emerald-300">
                       {item}
-                    </Link>
+                    </a>
                   </li>
                 ))}
               </ul>
@@ -676,51 +699,51 @@ function MainLayout() {
 
             {/* Col 3: Khám phá */}
             <div>
-              <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-3">Khám phá nhanh</h3>
+              <h3 className="mb-3 text-sm font-bold text-white">Khám phá nhanh</h3>
               <ul className="space-y-2">
                 <li>
-                  <Link to="/" className="hover:text-primary transition-colors">Trang chủ tài liệu</Link>
+                  <Link to="/" className="transition-colors hover:text-emerald-300">Trang chủ tài liệu</Link>
                 </li>
                 <li>
-                  <button onClick={() => setUploadModalOpen(true)} className="hover:text-primary transition-colors text-left cursor-pointer">
+                  <button onClick={handleUploadClick} className="cursor-pointer text-left transition-colors hover:text-emerald-300">
                     Đóng góp tài liệu mới
                   </button>
                 </li>
                 <li>
-                  <Link to="/profile" className="hover:text-primary transition-colors">Quản lý tài liệu đã tải</Link>
+                  <Link to="/profile" className="transition-colors hover:text-emerald-300">Quản lý tài liệu đã tải</Link>
                 </li>
                 <li>
-                  <a href="#faq" className="hover:text-primary transition-colors">Câu hỏi thường gặp (FAQ)</a>
+                  <a href="/#faq" className="transition-colors hover:text-emerald-300">Câu hỏi thường gặp</a>
                 </li>
               </ul>
             </div>
 
             {/* Col 4: Cam kết & Hỗ trợ */}
             <div>
-              <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-3">Chính sách & Hỗ trợ</h3>
+              <h3 className="mb-3 text-sm font-bold text-white">Chính sách & Hỗ trợ</h3>
               <ul className="space-y-2">
                 <li>
-                  <span className="text-slate-600 dark:text-slate-400">Chính sách bản quyền & Tác quyền</span>
+                  <span>Chính sách bản quyền & Tác quyền</span>
                 </li>
                 <li>
-                  <span className="text-slate-600 dark:text-slate-400">Tiêu chuẩn kiểm duyệt nội dung</span>
+                  <span>Tiêu chuẩn kiểm duyệt nội dung</span>
                 </li>
                 <li>
-                  <span className="text-slate-600 dark:text-slate-400">Quy chế hoạt động cộng đồng</span>
+                  <span>Quy chế hoạt động cộng đồng</span>
                 </li>
                 <li className="pt-2">
-                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 text-[11px]">
-                    <p className="font-semibold text-slate-800 dark:text-slate-200">Cần trợ giúp khẩn cấp?</p>
-                    <p className="text-slate-500 dark:text-slate-400 mt-0.5">Email: support@studyhub.edu.vn</p>
+                  <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-[11px]">
+                    <p className="font-semibold text-slate-200">Cần hỗ trợ?</p>
+                    <p className="mt-0.5 text-slate-400">support@studyhub.edu.vn</p>
                   </div>
                 </li>
               </ul>
             </div>
           </div>
 
-          <div className="border-t border-slate-200/60 dark:border-slate-800/60 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-400 dark:text-slate-500">
+          <div className="flex flex-col items-center justify-between gap-3 border-t border-white/10 pt-6 text-slate-500 sm:flex-row">
             <p>© 2026 StudyHub. Xây dựng vì mục đích học thuật và kết nối sinh viên.</p>
-            <p className="text-[11px]">Thiết kế chuẩn UI/UX Pro Max • Tương thích mọi thiết bị</p>
+            <p className="inline-flex items-center gap-1.5 text-[11px]"><ShieldCheck className="h-3.5 w-3.5" /> Học liệu mở · Chia sẻ có trách nhiệm</p>
           </div>
         </div>
       </footer>

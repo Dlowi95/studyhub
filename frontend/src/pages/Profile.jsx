@@ -60,7 +60,8 @@ export default function Profile() {
   const fetchProfile = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
-      navigate("/login");
+      window.dispatchEvent(new CustomEvent("openAuthModal", { detail: { tab: "login" } }));
+      navigate("/");
       return;
     }
 
@@ -85,7 +86,8 @@ export default function Profile() {
           setUser(parsed);
           setNewName(parsed.name || "");
         } catch {
-          navigate("/login");
+          window.dispatchEvent(new CustomEvent("openAuthModal", { detail: { tab: "login" } }));
+          navigate("/");
         }
       }
     } finally {

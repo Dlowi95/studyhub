@@ -1,10 +1,22 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UploadCloud, CheckCircle2, AlertCircle, Loader2, ShieldCheck, ArrowRight, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+const defaultSubjectOptions = [
+  "Giải tích",
+  "Đại số tuyến tính",
+  "Triết học Mác-Lênin",
+  "Cấu trúc dữ liệu & Giải thuật",
+  "Lập trình C/C++",
+  "Vật lý đại cương",
+  "Kinh tế vĩ mô",
+  "Mạng máy tính",
+  "Khác",
+];
 
 export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
   const { toast } = useToast();
@@ -17,18 +29,31 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [subjectOptions, setSubjectOptions] = useState(defaultSubjectOptions);
 
-  const subjectOptions = [
-    "Giải tích",
-    "Đại số tuyến tính",
-    "Triết học Mác-Lênin",
-    "Cấu trúc dữ liệu & Giải thuật",
-    "Lập trình C/C++",
-    "Vật lý đại cương",
-    "Kinh tế vĩ mô",
-    "Mạng máy tính",
-    "Khác",
-  ];
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    let cancelled = false;
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
+    fetch(`${apiUrl}/subjects`)
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Không thể tải học phần"))))
+      .then((data) => {
+        if (cancelled) return;
+        const savedNames = Array.isArray(data.subjects)
+          ? data.subjects.map((item) => item.name).filter(Boolean)
+          : [];
+        setSubjectOptions([...new Set([...savedNames, ...defaultSubjectOptions])]);
+      })
+      .catch(() => {
+        if (!cancelled) setSubjectOptions(defaultSubjectOptions);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files?.[0];
@@ -201,10 +226,10 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
                 <label className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-primary/50 dark:hover:border-primary/60 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-2xl cursor-pointer transition-all">
                   <UploadCloud className="w-10 h-10 text-slate-400 dark:text-slate-500 mb-2" />
                   <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Nhấp để tải file lên hoặc kéo thả vào đây</span>
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Hỗ trợ file: PDF, DOCX, PPTX (tối đa 25MB)</span>
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Hỗ trợ file: PDF, DOCX, PPTX, XLSX, TXT (tối đa 25MB)</span>
                   <input
                     type="file"
-                    accept=".pdf,.doc,.docx,.ppt,.pptx"
+                    accept=".pdf,.docx,.pptx,.xlsx,.txt"
                     className="hidden"
                     onChange={handleFileChange}
                   />

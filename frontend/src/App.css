@@ -1,5 +1,9 @@
 /* StudyHub App Base Utility Styles */
 
+#root {
+  min-height: 100vh;
+}
+
 /* Hide scrollbar for Chrome, Safari and Opera */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
