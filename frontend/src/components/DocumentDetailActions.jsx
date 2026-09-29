@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Download, FileText, MessageSquareWarning, Bookmark, Share2, Check } from "lucide-react";
+import { Download, FileText, MessageSquareWarning, Bookmark, Share2, Check, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { normalizeFileUrl } from "@/lib/file-url";
@@ -12,6 +12,7 @@ export default function DocumentDetailActions({
   reportStatus = null,
   fileUnavailable = false,
   fileIssue = "",
+  isDownloading = false,
 }) {
   const { toast } = useToast();
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -101,16 +102,24 @@ export default function DocumentDetailActions({
         {/* Main Download CTA */}
         <Button
           type="button"
-          disabled={fileUnavailable}
+          disabled={fileUnavailable || isDownloading}
           onClick={() => onDownload?.(doc)}
           className="group h-12 w-full justify-between rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 px-4 text-white shadow-[0_12px_28px_-14px_rgba(5,150,105,0.85)] transition-all hover:from-emerald-500 hover:to-teal-500 hover:shadow-[0_16px_32px_-14px_rgba(5,150,105,0.95)] active:scale-[0.99] disabled:bg-none disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
         >
           <span className="flex min-w-0 items-center gap-2.5 text-sm font-bold">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/15 transition-colors group-hover:bg-white/20">
-              <Download className="h-4 w-4" />
+              {isDownloading ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
             </span>
             <span className="truncate">
-              {fileUnavailable ? "Tệp không khả dụng" : "Tải xuống tài liệu"}
+              {fileUnavailable
+                ? "Tệp không khả dụng"
+                : isDownloading
+                  ? "Đang tải tài liệu..."
+                  : "Tải xuống tài liệu"}
             </span>
           </span>
           {!fileUnavailable && (
