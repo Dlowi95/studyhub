@@ -27,6 +27,7 @@ import {
   Check,
   X,
   Loader2,
+  ShieldAlert,
 } from "lucide-react";
 
 export default function Profile() {
@@ -667,6 +668,14 @@ export default function Profile() {
               <User className="w-3.5 h-3.5" />
               <span>Tài khoản</span>
             </button>
+
+            <Link
+              to="/my-reports"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all hover:bg-slate-200/60 dark:hover:bg-slate-700/50"
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
+              <span>Báo cáo của tôi</span>
+            </Link>
           </div>
 
           {/* Quick Refresh */}

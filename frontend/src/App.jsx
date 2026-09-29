@@ -10,6 +10,7 @@ import AuthModal from "./components/AuthModal";
 import UploadModal from "./components/UploadModal";
 import UploadDocument from "./pages/UploadDocument";
 import DocumentDetailPage from "./pages/DocumentDetailPage";
+import MyReports from "./pages/MyReports";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "./context/ThemeContext";
 import ThemeToggle from "./components/ThemeToggle";
@@ -252,6 +253,14 @@ function MainLayout() {
             element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-reports"
+            element={
+              <ProtectedRoute>
+                <MyReports />
               </ProtectedRoute>
             }
           />

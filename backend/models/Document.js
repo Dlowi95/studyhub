@@ -23,6 +23,10 @@ const documentSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    fileSize: {
+      type: Number,
+      default: 0,
+    },
     subjectId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Subject",

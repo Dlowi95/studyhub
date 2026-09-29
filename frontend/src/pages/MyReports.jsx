@@ -11,7 +11,9 @@ import {
 } from "@/components/ui/table";
 import { Loader2 } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL;
+import { ArrowLeft, ShieldAlert } from "lucide-react";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const STATUS_MAP = {
   pending: { label: "Đang chờ xử lý", variant: "secondary" },
@@ -28,13 +30,6 @@ function formatDate(iso) {
   });
 }
 
-/**
- * Trang "Báo cáo của tôi" — danh sách các báo cáo vi phạm mà người dùng
- * hiện tại đã gửi, kèm trạng thái xử lý.
- *
- * Cần được thêm vào App.jsx, vd:
- *   <Route path="/my-reports" element={<ProtectedRoute><MyReports /></ProtectedRoute>} />
- */
 export default function MyReports() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,12 +57,29 @@ export default function MyReports() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Báo cáo của tôi</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Theo dõi các báo cáo vi phạm bạn đã gửi và trạng thái xử lý.
-        </p>
+    <div className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mb-6 flex items-center justify-between">
+        <Link
+          to="/profile"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-primary transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Quay lại hồ sơ</span>
+        </Link>
+      </div>
+
+      <div className="mb-6 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+            <ShieldAlert className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Báo cáo của tôi</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Theo dõi danh sách các phản ánh, báo cáo vi phạm bạn đã gửi và trạng thái xử lý từ ban quản trị.
+            </p>
+          </div>
+        </div>
       </div>
 
       {loading && (

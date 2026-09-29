@@ -122,15 +122,13 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
               });
               const googleUser = await userInfoRes.json();
 
-              // 2. Gửi thông tin về backend StudyHub
+              // 2. Gửi Google access_token về backend StudyHub để xác thực an toàn
               const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
               const res = await fetch(`${apiUrl}/auth/google`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  email: googleUser.email,
-                  name: googleUser.name,
-                  avatarUrl: googleUser.picture,
+                  accessToken: tokenResponse.access_token,
                 }),
               });
 

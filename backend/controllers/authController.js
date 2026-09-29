@@ -7,13 +7,14 @@ const cloudinary = require("../config/cloudinary");
 
 const avatarDir = path.join(__dirname, "..", "uploads", "avatars");
 
-const saveLocalAvatar = async (file) => {
+const saveLocalAvatar = async (file, req) => {
   fs.mkdirSync(avatarDir, { recursive: true });
   const ext = path.extname(file.originalname || "") || ".png";
   const safeName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}${ext}`;
   const filePath = path.join(avatarDir, safeName);
   await fs.promises.writeFile(filePath, file.buffer);
-  return `http://localhost:${process.env.PORT || 5000}/uploads/avatars/${encodeURIComponent(safeName)}`;
+  const baseUrl = process.env.BASE_URL || (req ? `${req.protocol}://${req.get("host")}` : `http://localhost:${process.env.PORT || 5000}`);
+  return `${baseUrl}/uploads/avatars/${encodeURIComponent(safeName)}`;
 };
 
 exports.register = async (req, res) => {
@@ -161,10 +162,10 @@ exports.updateProfile = async (req, res) => {
           });
           avatarUrl = result.secure_url;
         } catch (cloudErr) {
-          avatarUrl = await saveLocalAvatar(req.file);
+          avatarUrl = await saveLocalAvatar(req.file, req);
         }
       } else {
-        avatarUrl = await saveLocalAvatar(req.file);
+        avatarUrl = await saveLocalAvatar(req.file, req);
       }
       user.avatarUrl = avatarUrl;
     } else if (req.body.avatarUrl) {
@@ -195,11 +196,57 @@ exports.updateProfile = async (req, res) => {
 
 exports.googleLogin = async (req, res) => {
   try {
-    const { email, name, avatarUrl } = req.body;
+    const { token, accessToken, credential, idToken } = req.body;
+    const googleAuthToken = accessToken || token || credential || idToken;
 
-    if (!email) {
-      return res.status(400).json({ message: "Email is required from Google account" });
+    if (!googleAuthToken) {
+      return res.status(400).json({ message: "Thiếu token xác thực Google" });
     }
+
+    let verifiedEmail = "";
+    let verifiedName = "";
+    let verifiedPicture = "";
+
+    // 1. Xác thực Google OAuth2 Access Token hoặc ID Token với Google APIs
+    try {
+      if (credential || idToken) {
+        // Xác thực Google ID Token
+        const verifyRes = await fetch(
+          `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential || idToken)}`
+        );
+        if (!verifyRes.ok) {
+          throw new Error("ID Token Google không hợp lệ");
+        }
+        const payload = await verifyRes.json();
+        verifiedEmail = payload.email;
+        verifiedName = payload.name;
+        verifiedPicture = payload.picture;
+      } else {
+        // Xác thực Google Access Token qua UserInfo endpoint
+        const verifyRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${googleAuthToken}` },
+        });
+        if (!verifyRes.ok) {
+          throw new Error("Access Token Google không hợp lệ hoặc đã hết hạn");
+        }
+        const profile = await verifyRes.json();
+        verifiedEmail = profile.email;
+        verifiedName = profile.name || profile.given_name;
+        verifiedPicture = profile.picture;
+      }
+    } catch (verifyErr) {
+      return res.status(401).json({
+        message: "Xác thực tài khoản Google thất bại: " + verifyErr.message,
+      });
+    }
+
+    if (!verifiedEmail) {
+      return res.status(400).json({ message: "Không tìm thấy email từ tài khoản Google được xác thực" });
+    }
+
+    const email = verifiedEmail.toLowerCase().trim();
+    const name = (verifiedName || req.body.name || email.split("@")[0]).trim();
+    const avatarUrl = verifiedPicture || req.body.avatarUrl || "";
 
     // Check if user exists
     let user = await User.findOne({ email });
@@ -211,11 +258,11 @@ exports.googleLogin = async (req, res) => {
       const dummyHash = await bcrypt.hash(Math.random().toString(36), 10);
 
       user = new User({
-        name: name || email.split("@")[0],
+        name,
         email,
         passwordHash: dummyHash,
         role: assignedRole,
-        avatarUrl: avatarUrl || "",
+        avatarUrl,
         status: "active",
       });
 
@@ -232,7 +279,7 @@ exports.googleLogin = async (req, res) => {
       return res.status(403).json({ message: "Tài khoản của bạn đã bị khoá" });
     }
 
-    const token = jwt.sign(
+    const appToken = jwt.sign(
       { id: user._id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
@@ -240,7 +287,7 @@ exports.googleLogin = async (req, res) => {
 
     return res.json({
       message: "Đăng nhập Google thành công",
-      token,
+      token: appToken,
       user: {
         id: user._id,
         name: user.name,

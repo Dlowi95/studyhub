@@ -2,6 +2,9 @@ const fs = require("fs");
 const path = require("path");
 const cloudinary = require("../config/cloudinary");
 const Document = require("../models/Document");
+const Review = require("../models/review");
+const Report = require("../models/report");
+const { deleteDocumentPhysicalFile } = require("../utils/fileCleanup");
 
 const uploadDir = path.join(__dirname, "..", "uploads");
 
@@ -18,12 +21,13 @@ const sanitizeFileName = (name = "") => {
   return `${normalized}${extension}`;
 };
 
-const saveLocalFile = async (file) => {
+const saveLocalFile = async (file, req) => {
   fs.mkdirSync(uploadDir, { recursive: true });
   const safeName = `${Date.now()}-${sanitizeFileName(file.originalname)}`;
   const filePath = path.join(uploadDir, safeName);
   await fs.promises.writeFile(filePath, file.buffer);
-  return `http://localhost:${process.env.PORT || 5000}/uploads/${encodeURIComponent(safeName)}`;
+  const baseUrl = process.env.BASE_URL || (req ? `${req.protocol}://${req.get("host")}` : `http://localhost:${process.env.PORT || 5000}`);
+  return `${baseUrl}/uploads/${encodeURIComponent(safeName)}`;
 };
 
 exports.uploadDocument = async (req, res) => {
@@ -64,10 +68,10 @@ exports.uploadDocument = async (req, res) => {
         fileUrl = result.secure_url;
       } catch (cloudError) {
         console.warn("Cloudinary upload failed, falling back to local storage.", cloudError.message);
-        fileUrl = await saveLocalFile(req.file);
+        fileUrl = await saveLocalFile(req.file, req);
       }
     } else {
-      fileUrl = await saveLocalFile(req.file);
+      fileUrl = await saveLocalFile(req.file, req);
     }
 
     const doc = new Document({
@@ -76,6 +80,7 @@ exports.uploadDocument = async (req, res) => {
       fileUrl,
       fileName: req.file.originalname,
       fileType: req.body.fileType || req.file.mimetype || "FILE",
+      fileSize: req.file.size || 0,
       subjectId: subjectId || null,
       subjectName: subjectName || "Khác",
       uploaderId: uploaderId || null,
@@ -368,6 +373,13 @@ exports.deleteMyDocument = async (req, res) => {
     if (doc.uploaderId?.toString() !== userId?.toString() && req.user?.role !== "admin") {
       return res.status(403).json({ message: "Bạn không có quyền xoá tài liệu này" });
     }
+
+    // Xóa file vật lý và cascade xóa reviews, reports liên quan
+    await Promise.allSettled([
+      deleteDocumentPhysicalFile(doc.fileUrl),
+      Review.deleteMany({ documentId: id }),
+      Report.deleteMany({ documentId: id }),
+    ]);
 
     await Document.findByIdAndDelete(id);
     return res.json({ message: "Xoá tài liệu thành công" });

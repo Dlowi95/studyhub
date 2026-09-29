@@ -1,5 +1,8 @@
 const User = require("../models/user");
 const Document = require("../models/Document");
+const Review = require("../models/review");
+const Report = require("../models/report");
+const { deleteDocumentPhysicalFile } = require("../utils/fileCleanup");
 
 const parseTags = (tagsValue) => {
   if (Array.isArray(tagsValue)) return tagsValue.map((tag) => String(tag).trim()).filter(Boolean);
@@ -136,11 +139,20 @@ exports.updateDocument = async (req, res) => {
 
 exports.deleteDocument = async (req, res) => {
   try {
-    const document = await Document.findByIdAndDelete(req.params.id);
+    const document = await Document.findById(req.params.id);
 
     if (!document) {
       return res.status(404).json({ message: "Tài liệu không tồn tại" });
     }
+
+    // Xoá file vật lý & xoá cascade reviews, reports
+    await Promise.allSettled([
+      deleteDocumentPhysicalFile(document.fileUrl),
+      Review.deleteMany({ documentId: req.params.id }),
+      Report.deleteMany({ documentId: req.params.id }),
+    ]);
+
+    await Document.findByIdAndDelete(req.params.id);
 
     return res.json({
       message: "Xoá tài liệu thành công",
