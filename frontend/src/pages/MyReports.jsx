@@ -1,15 +1,6 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   ShieldAlert,
   Clock,
@@ -20,7 +11,6 @@ import {
   RefreshCw,
   MessageSquare,
   AlertTriangle,
-  ArrowLeft,
   ExternalLink,
 } from "lucide-react";
 
@@ -89,7 +79,7 @@ export default function MyReports() {
   };
 
   useEffect(() => {
-    fetchReports();
+    queueMicrotask(() => void fetchReports());
   }, []);
 
   const counts = {

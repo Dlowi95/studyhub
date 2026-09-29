@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,6 @@ import {
   Check,
   X,
   Loader2,
-  ShieldAlert,
 } from "lucide-react";
 
 export default function Profile() {
@@ -78,14 +77,14 @@ export default function Profile() {
       setUser(data);
       setNewName(data.name || "");
       localStorage.setItem("user", JSON.stringify(data));
-    } catch (err) {
+    } catch {
       const localUser = localStorage.getItem("user");
       if (localUser) {
         try {
           const parsed = JSON.parse(localUser);
           setUser(parsed);
           setNewName(parsed.name || "");
-        } catch (e) {
+        } catch {
           navigate("/login");
         }
       }
@@ -123,16 +122,18 @@ export default function Profile() {
       setSavedDocs(saved);
       const history = JSON.parse(localStorage.getItem("studyhub_downloads") || "[]");
       setDownloadHistory(history);
-    } catch (e) {
+    } catch {
       setSavedDocs([]);
       setDownloadHistory([]);
     }
   };
 
   useEffect(() => {
-    fetchProfile();
-    fetchMyDocuments();
-    loadLocalActivity();
+    queueMicrotask(() => {
+      void fetchProfile();
+      void fetchMyDocuments();
+      loadLocalActivity();
+    });
 
     // Listen for custom event if new upload happens
     const handleDocUploaded = () => {
@@ -140,6 +141,8 @@ export default function Profile() {
     };
     window.addEventListener("documentUploaded", handleDocUploaded);
     return () => window.removeEventListener("documentUploaded", handleDocUploaded);
+    // These loaders are intentionally run once when the profile mounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
   const handleLogout = () => {
@@ -191,7 +194,7 @@ export default function Profile() {
       try {
         data = await res.json();
       } catch (parseErr) {
-        throw new Error("Không thể phân tích phản hồi máy chủ.");
+        throw new Error("Không thể phân tích phản hồi máy chủ.", { cause: parseErr });
       }
 
       if (!res.ok) {
@@ -246,7 +249,7 @@ export default function Profile() {
       try {
         data = await res.json();
       } catch (parseErr) {
-        throw new Error("Không thể phân tích phản hồi máy chủ.");
+        throw new Error("Không thể phân tích phản hồi máy chủ.", { cause: parseErr });
       }
 
       if (!res.ok) {
@@ -286,7 +289,9 @@ export default function Profile() {
       let data = {};
       try {
         data = await res.json();
-      } catch (e) {}
+      } catch {
+        data = {};
+      }
 
       if (res.ok) {
         setDocuments((prev) => prev.filter((doc) => doc._id !== id));
@@ -302,7 +307,7 @@ export default function Profile() {
           description: data.message || "Xoá tài liệu thất bại.",
         });
       }
-    } catch (err) {
+    } catch {
       toast({
         variant: "destructive",
         title: "Lỗi hệ thống",

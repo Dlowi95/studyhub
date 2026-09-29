@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 const ThemeContext = createContext({
   theme: "light",
@@ -36,4 +36,6 @@ export function ThemeProvider({ children }) {
   );
 }
 
+// This hook intentionally lives next to its provider for a single theme API.
+// eslint-disable-next-line react-refresh/only-export-components
 export const useTheme = () => useContext(ThemeContext);

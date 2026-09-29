@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Search,
@@ -69,7 +69,9 @@ export default function Home({ onOpenAuth, user }) {
   };
 
   useEffect(() => {
-    fetchApprovedDocuments();
+    queueMicrotask(() => void fetchApprovedDocuments());
+    // The document loader is intentionally run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleUploadClick = () => {
@@ -94,7 +96,7 @@ export default function Home({ onOpenAuth, user }) {
 
     try {
       await fetch(`${apiUrl}/documents/${doc.id}/view`, { method: "POST" });
-    } catch (e) {
+    } catch {
       // ignore view counter failure
     }
 

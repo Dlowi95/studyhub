@@ -1,4 +1,3 @@
-import React from "react";
 import { Download, Eye, Star, Tag, FileText } from "lucide-react";
 
 export default function DocumentDetailMeta({ doc }) {

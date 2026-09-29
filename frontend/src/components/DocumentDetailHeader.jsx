@@ -1,6 +1,4 @@
-import React from "react";
-import { CalendarDays, UserRound, FileText, CheckCircle2, Clock, AlertCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { CalendarDays, FileText, CheckCircle2, Clock } from "lucide-react";
 
 export default function DocumentDetailHeader({ doc }) {
   if (!doc) return null;

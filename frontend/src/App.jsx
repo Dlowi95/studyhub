@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from "react";
+import { useState, useEffect, Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AuthModal from "./components/AuthModal";
@@ -18,7 +18,6 @@ import {
   Home as HomeIcon,
   BookOpen,
   Sparkles,
-  User as UserIcon,
 } from "lucide-react";
 import "./App.css";
 
@@ -54,7 +53,7 @@ function MainLayout() {
 
   // Close mobile drawer when route changes
   useEffect(() => {
-    setMobileMenuOpen(false);
+    queueMicrotask(() => setMobileMenuOpen(false));
   }, [location.pathname]);
 
   // Notification State (Yêu cầu 4)
@@ -127,7 +126,7 @@ function MainLayout() {
     if (storedUser) {
       try {
         setUser(JSON.parse(storedUser));
-      } catch (e) {
+      } catch {
         setUser(null);
       }
     } else {
@@ -155,7 +154,7 @@ function MainLayout() {
   };
 
   useEffect(() => {
-    handleStorageChange();
+    queueMicrotask(() => void handleStorageChange());
 
     window.addEventListener("storage", handleStorageChange);
     window.addEventListener("authChange", handleStorageChange);
@@ -179,6 +178,8 @@ function MainLayout() {
       window.removeEventListener("openAuthModal", handleOpenAuthModal);
       window.removeEventListener("openUploadModal", handleOpenUploadModal);
     };
+    // The storage listeners are registered once for the lifetime of the layout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const openAuth = (tab = "login") => {

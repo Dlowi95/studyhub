@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Download, FileText, MessageSquareWarning, Bookmark, Share2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -12,8 +12,12 @@ export default function DocumentDetailActions({ doc, onDownload, onReport, hasRe
     if (!doc?.id) return;
     try {
       const saved = JSON.parse(localStorage.getItem("studyhub_bookmarks") || "[]");
-      setIsBookmarked(saved.some((item) => item.id === doc.id || item._id === doc.id));
-    } catch (e) {}
+      queueMicrotask(() =>
+        setIsBookmarked(saved.some((item) => item.id === doc.id || item._id === doc.id))
+      );
+    } catch {
+      queueMicrotask(() => setIsBookmarked(false));
+    }
   }, [doc?.id]);
 
   const handleToggleBookmark = () => {
@@ -50,7 +54,7 @@ export default function DocumentDetailActions({ doc, onDownload, onReport, hasRe
         });
       }
       localStorage.setItem("studyhub_bookmarks", JSON.stringify(updated));
-    } catch (e) {
+    } catch {
       toast({
         variant: "destructive",
         title: "Lỗi",
@@ -69,7 +73,7 @@ export default function DocumentDetailActions({ doc, onDownload, onReport, hasRe
         description: "Liên kết tài liệu đã được lưu vào bộ nhớ tạm để bạn chia sẻ!",
       });
       setTimeout(() => setIsCopied(false), 2000);
-    } catch (err) {
+    } catch {
       toast({
         title: "Chia sẻ liên kết",
         description: url,

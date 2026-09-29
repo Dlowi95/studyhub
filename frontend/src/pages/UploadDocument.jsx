@@ -1,13 +1,11 @@
-import React, { useState, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useRef } from "react";
+import { Link } from "react-router-dom";
 import {
   UploadCloud,
-  FileText,
   CheckCircle2,
   AlertCircle,
   Loader2,
   ArrowLeft,
-  X,
   FileCheck,
   Sparkles,
 } from "lucide-react";
@@ -47,10 +45,8 @@ export default function UploadDocument() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-  const [createdDocId, setCreatedDocId] = useState(null);
 
   const fileInputRef = useRef(null);
-  const navigate = useNavigate();
   const { toast } = useToast();
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -136,7 +132,6 @@ export default function UploadDocument() {
       }
 
       setSuccess(true);
-      setCreatedDocId(data.document?._id || data.document?.id);
 
       toast({
         title: "Tải lên thành công!",
@@ -185,7 +180,6 @@ export default function UploadDocument() {
                 setDescription("");
                 setTags("");
                 setFile(null);
-                setCreatedDocId(null);
               }}
               variant="outline"
               className="flex-1 rounded-xl text-xs font-semibold"

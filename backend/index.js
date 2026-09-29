@@ -17,6 +17,12 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const app = express();
 const port = process.env.PORT || 5000;
 const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/studyhub";
+const mongoOptions = {
+  serverSelectionTimeoutMS: 30000,
+  connectTimeoutMS: 30000,
+  socketTimeoutMS: 30000,
+  ...(mongoUri.startsWith("mongodb+srv://") ? { tls: true, tlsAllowInvalidCertificates: false } : {}),
+};
 
 app.use(cors());
 app.use(express.json());
@@ -44,26 +50,24 @@ app.get("/", (req, res) => {
   res.json({ message: "Welcome to StudyHub API" });
 });
 
-mongoose
-  .connect(mongoUri, {
-    serverSelectionTimeoutMS: 30000,
-    connectTimeoutMS: 30000,
-    socketTimeoutMS: 30000,
-    tls: true,
-    tlsAllowInvalidCertificates: false,
-  })
-  .then(() => {
-    console.log("MongoDB connected successfully");
-
-    app.listen(port, () => {
-      console.log(`Server running on port ${port}`);
-    });
-  })
-  .catch((error) => {
-    console.error("MongoDB connection failed. Check MONGO_URI or start a local MongoDB instance.");
-    console.error(error.message);
-
-    app.listen(port, () => {
-      console.log(`Server running on port ${port} without MongoDB connection.`);
-    });
+const startServer = () => {
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
   });
+
+  mongoose
+    .connect(mongoUri, mongoOptions)
+    .then(() => {
+      console.log("MongoDB connected successfully");
+    })
+    .catch((error) => {
+      console.error("MongoDB connection failed. Check MONGO_URI or start a local MongoDB instance.");
+      console.error(error.message);
+    });
+};
+
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = { app, startServer };

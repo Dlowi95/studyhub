@@ -49,7 +49,7 @@ export default function ReviewList({ documentId, refreshKey, onAvgRatingChange }
   }, [documentId]);
 
   useEffect(() => {
-    fetchReviews();
+    queueMicrotask(() => void fetchReviews());
   }, [fetchReviews, refreshKey]);
 
   const handleDelete = async (reviewId) => {

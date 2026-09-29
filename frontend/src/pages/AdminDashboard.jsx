@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Table,
@@ -56,9 +56,6 @@ import {
   Tooltip as ChartTooltip,
   CartesianGrid,
   Cell,
-  PieChart,
-  Pie,
-  Legend,
 } from "recharts";
 import {
   LayoutDashboard,
@@ -79,7 +76,6 @@ import {
   TrendingUp,
   MoreVertical,
   Eye,
-  BookOpen,
   MessageSquareWarning,
   Menu,
   X,
@@ -87,12 +83,8 @@ import {
   Shield,
   ShieldCheck,
   ShieldAlert,
-  Filter,
   Check,
   BarChart3,
-  AlertTriangle,
-  UserCheck,
-  UserX,
   RotateCcw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -284,6 +276,8 @@ function SidebarNav({
   );
 }
 
+const PAGE_LOAD_TIME = Date.now();
+
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview"); // "overview" | "users" | "documents" | "subjects" | "pending" | "reports"
   const [users, setUsers] = useState([]);
@@ -400,14 +394,18 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const adminStr = localStorage.getItem("user");
-    if (adminStr) {
-      try {
-        setCurrentAdmin(JSON.parse(adminStr));
-      } catch (e) {
-        console.error(e);
+    queueMicrotask(() => {
+      if (adminStr) {
+        try {
+          setCurrentAdmin(JSON.parse(adminStr));
+        } catch (error) {
+          console.error(error);
+        }
       }
-    }
-    fetchData();
+      void fetchData();
+    });
+    // fetchData is intentionally run once when the dashboard mounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // --- Document Approvals & Rejections ---
@@ -807,7 +805,7 @@ export default function AdminDashboard() {
   const rejectedDocsCount = allDocs.filter((d) => d.status === "rejected").length;
   const recentUsersCount = users.filter((user) => {
     const createdAt = new Date(user.createdAt).getTime();
-    return createdAt >= Date.now() - 30 * 24 * 60 * 60 * 1000;
+    return createdAt >= PAGE_LOAD_TIME - 30 * 24 * 60 * 60 * 1000;
   }).length;
 
   const activityChartData = (documentStats?.monthlyUploads || []).map((item) => ({
@@ -832,16 +830,9 @@ export default function AdminDashboard() {
   const adminUsersCount = users.filter((u) => u.role === "admin").length;
   const blockedUsersCount = users.filter((u) => u.status === "blocked").length;
 
-  const userRoleChartData = [
-    { name: "Sinh viên", value: studentUsersCount, color: "#3b82f6" },
-    { name: "Kiểm duyệt", value: moderatorUsersCount, color: "#8b5cf6" },
-    { name: "Quản trị", value: adminUsersCount, color: "#10b981" },
-  ];
-
   // Reports KPIs
   const pendingReportsCount = reports.filter((report) => report.status === "pending").length;
   const resolvedReportsCount = reports.filter((report) => report.status === "resolved").length;
-  const dismissedReportsCount = reports.filter((report) => report.status === "dismissed").length;
   const reportResolutionRate = reports.length > 0 ? Math.round((resolvedReportsCount / reports.length) * 100) : 100;
 
   // File format breakdown

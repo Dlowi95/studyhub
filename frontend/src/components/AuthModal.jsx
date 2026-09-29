@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,12 +21,14 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
 
   // Sync tab when initialTab or isOpen changes
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+
+    queueMicrotask(() => {
       setTab(initialTab);
       setError("");
       setSuccess("");
       setShowPassword(false);
-    }
+    });
   }, [isOpen, initialTab]);
 
   const switchTab = (newTab) => {
@@ -137,7 +139,9 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
               const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
                 headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
               });
-              const googleUser = await userInfoRes.json();
+              if (!userInfoRes.ok) {
+                throw new Error("Không thể xác thực tài khoản Google");
+              }
 
               // 2. Gửi Google access_token về backend StudyHub để xác thực an toàn
               const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";

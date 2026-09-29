@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UploadCloud, CheckCircle2, FileText, AlertCircle, Loader2, ShieldCheck, ArrowRight, ArrowLeft } from "lucide-react";
+import { UploadCloud, CheckCircle2, AlertCircle, Loader2, ShieldCheck, ArrowRight, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {

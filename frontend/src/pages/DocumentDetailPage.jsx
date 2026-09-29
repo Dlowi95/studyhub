@@ -1,27 +1,19 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import DocumentCard from "@/components/DocumentCard";
 import DocumentDetailActions from "@/components/DocumentDetailActions";
 import DocumentDetailHeader from "@/components/DocumentDetailHeader";
 import DocumentDetailMeta from "@/components/DocumentDetailMeta";
 import DocumentDetailReviews from "@/components/DocumentDetailReviews";
 import ReportModal from "@/components/ReportModal";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ArrowLeft,
   ChevronRight,
   FileText,
   AlertTriangle,
   Download,
-  Share2,
-  Bookmark,
   CheckCircle2,
-  Clock,
-  Sparkles,
   ExternalLink,
-  ShieldAlert,
 } from "lucide-react";
 
 const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -178,7 +170,9 @@ export default function DocumentDetailPage() {
         });
         localStorage.setItem("studyhub_downloads", JSON.stringify(history.slice(0, 50)));
       }
-    } catch (e) {}
+    } catch {
+      // Local download history is optional and must not block the download.
+    }
 
     try {
       await fetch(`${apiUrl}/documents/${docItem.id}/download`, { method: "POST" });
@@ -189,7 +183,7 @@ export default function DocumentDetailPage() {
         title: "Bắt đầu tải xuống",
         description: `Đang tải file ${docItem.fileName || docItem.title}`,
       });
-    } catch (error) {
+    } catch {
       // ignore network failure for counter update
     }
   };
