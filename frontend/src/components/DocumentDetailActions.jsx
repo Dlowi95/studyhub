@@ -4,7 +4,15 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { normalizeFileUrl } from "@/lib/file-url";
 
-export default function DocumentDetailActions({ doc, onDownload, onReport, hasReported = false, reportStatus = null }) {
+export default function DocumentDetailActions({
+  doc,
+  onDownload,
+  onReport,
+  hasReported = false,
+  reportStatus = null,
+  fileUnavailable = false,
+  fileIssue = "",
+}) {
   const { toast } = useToast();
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -91,12 +99,13 @@ export default function DocumentDetailActions({ doc, onDownload, onReport, hasRe
         {/* Main Download CTA */}
         <Button
           type="button"
+          disabled={fileUnavailable}
           onClick={() => onDownload?.(doc)}
-          className="w-full sm:flex-1 min-w-0 bg-primary hover:bg-primary/90 text-white rounded-xl h-11 px-4 font-bold shadow-xs active:scale-[0.98] transition-all gap-2 text-sm"
+          className="w-full sm:flex-1 min-w-0 bg-primary hover:bg-primary/90 text-white rounded-xl h-11 px-4 font-bold shadow-xs active:scale-[0.98] transition-all gap-2 text-sm disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
         >
           <Download className="w-4 h-4" />
-          <span>Tải xuống tài liệu</span>
-          {doc.downloadCount > 0 && (
+          <span>{fileUnavailable ? "Tệp không khả dụng" : "Tải xuống tài liệu"}</span>
+          {!fileUnavailable && doc.downloadCount > 0 && (
             <span className="ml-1 px-2 py-0.5 rounded-full bg-white/20 text-xs font-semibold">
               {doc.downloadCount}
             </span>
@@ -108,7 +117,12 @@ export default function DocumentDetailActions({ doc, onDownload, onReport, hasRe
           <Button
             type="button"
             variant="outline"
-            onClick={() => window.open(normalizeFileUrl(doc.fileUrl), "_blank", "noopener,noreferrer")}
+            disabled={fileUnavailable}
+            onClick={() => {
+              if (!fileUnavailable) {
+                window.open(normalizeFileUrl(doc.fileUrl), "_blank", "noopener,noreferrer");
+              }
+            }}
             className="w-full sm:flex-1 min-w-0 rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 h-11 px-4 text-slate-700 dark:text-slate-200 font-semibold text-sm gap-2"
           >
             <FileText className="w-4 h-4 text-slate-500 dark:text-slate-400" />
@@ -116,6 +130,12 @@ export default function DocumentDetailActions({ doc, onDownload, onReport, hasRe
           </Button>
         )}
       </div>
+
+      {fileUnavailable && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+          {fileIssue || "Tệp nguồn không còn trên máy chủ. Người đăng cần tải lại tài liệu."}
+        </p>
+      )}
 
       {/* Utility Action Buttons */}
       <div className="flex flex-wrap items-center gap-2 pt-1">

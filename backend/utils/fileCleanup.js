@@ -1,26 +1,30 @@
 const fs = require("fs");
-const path = require("path");
 const cloudinary = require("../config/cloudinary");
-
-const uploadDir = path.join(__dirname, "..", "uploads");
+const { deleteGridFsFile, parseDocumentSource } = require("./documentStorage");
 
 /**
  * Xóa file vật lý đã lưu (trên Cloudinary hoặc thư mục uploads cục bộ)
- * @param {string} fileUrl - Đường dẫn file đã lưu
+ * @param {string|object} source - Đường dẫn file hoặc bản ghi tài liệu
  */
-const deleteDocumentPhysicalFile = async (fileUrl) => {
+const deleteDocumentPhysicalFile = async (source) => {
+  const fileUrl = typeof source === "string" ? source : source?.fileUrl;
   if (!fileUrl || typeof fileUrl !== "string") return;
 
   try {
+    const parsedSource = parseDocumentSource(fileUrl);
+    const storageKey = typeof source === "object" && source?.storageKey
+      ? source.storageKey
+      : parsedSource.storageKey;
+
+    if ((source?.storageProvider === "gridfs" || parsedSource.kind === "gridfs") && storageKey) {
+      await deleteGridFsFile(storageKey);
+      return;
+    }
+
     // 1. Nếu là file lưu local trong thư mục /uploads/
-    if (fileUrl.includes("/uploads/")) {
-      const parts = fileUrl.split("/uploads/");
-      if (parts[1]) {
-        const fileName = decodeURIComponent(parts[1]);
-        const fullPath = path.join(uploadDir, fileName);
-        if (fs.existsSync(fullPath)) {
-          await fs.promises.unlink(fullPath);
-        }
+    if (parsedSource.kind === "local") {
+      if (fs.existsSync(parsedSource.localPath)) {
+        await fs.promises.unlink(parsedSource.localPath);
       }
       return;
     }

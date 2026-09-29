@@ -25,7 +25,7 @@ if (isConfigured) {
     api_secret: apiSecret,
   });
 } else {
-  console.warn("Cloudinary is not configured. Falling back to local file storage for uploads.");
+  console.warn("Cloudinary is not configured. Uploads will use MongoDB GridFS storage.");
 }
 
 module.exports = Object.assign(cloudinary, { isConfigured });

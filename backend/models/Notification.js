@@ -10,8 +10,21 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['report_resolved', 'report_dismissed', 'system'],
+      enum: [
+        'document_submitted',
+        'document_approved',
+        'document_rejected',
+        'report_submitted',
+        'report_resolved',
+        'report_dismissed',
+        'system',
+      ],
       default: 'system',
+    },
+    eventKey: {
+      type: String,
+      trim: true,
+      default: undefined,
     },
     title: {
       type: String,
@@ -32,6 +45,11 @@ const notificationSchema = new mongoose.Schema(
       ref: 'Report',
       default: null,
     },
+    relatedDocumentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Document',
+      default: null,
+    },
     read: {
       type: Boolean,
       default: false,
@@ -39,6 +57,11 @@ const notificationSchema = new mongoose.Schema(
     },
   },
   { timestamps: true }
+);
+
+notificationSchema.index(
+  { recipient: 1, eventKey: 1 },
+  { unique: true, partialFilterExpression: { eventKey: { $type: 'string' } } }
 );
 
 module.exports = mongoose.model('Notification', notificationSchema);

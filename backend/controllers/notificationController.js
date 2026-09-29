@@ -1,8 +1,10 @@
 const Notification = require('../models/Notification');
+const { syncHistoricalNotificationsForUser } = require('../utils/notificationService');
 
 // GET /api/notifications
 exports.getMyNotifications = async (req, res) => {
   try {
+    await syncHistoricalNotificationsForUser(req.user);
     const notifications = await Notification.find({ recipient: req.user._id })
       .sort({ createdAt: -1 })
       .limit(50);
@@ -17,6 +19,7 @@ exports.getMyNotifications = async (req, res) => {
 // GET /api/notifications/unread-count
 exports.getUnreadCount = async (req, res) => {
   try {
+    await syncHistoricalNotificationsForUser(req.user);
     const unreadCount = await Notification.countDocuments({
       recipient: req.user._id,
       read: false,

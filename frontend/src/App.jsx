@@ -199,6 +199,29 @@ function MainLayout() {
     };
   }, [handleStorageChange]);
 
+  useEffect(() => {
+    if (!token) return undefined;
+
+    const refreshNotifications = () => {
+      void fetchNotifications(token);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshNotifications();
+    };
+
+    const initialTimer = window.setTimeout(refreshNotifications, 0);
+    const pollTimer = window.setInterval(refreshNotifications, 30000);
+    window.addEventListener("focus", refreshNotifications);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(pollTimer);
+      window.removeEventListener("focus", refreshNotifications);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [fetchNotifications, token]);
+
   const openAuth = (tab = "login") => {
     setAuthModalTab(tab);
     setAuthModalOpen(true);

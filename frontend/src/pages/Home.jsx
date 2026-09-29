@@ -39,6 +39,8 @@ const normalizeDocument = (doc) => ({
   size: doc.fileSize ? `${(doc.fileSize / 1024 / 1024).toFixed(1)} MB` : null,
   fileUrl: doc.fileUrl,
   createdAt: doc.createdAt,
+  fileAvailable: doc.fileAvailable,
+  fileIssue: doc.fileIssue || "",
 });
 
 const studyJourney = [
@@ -89,7 +91,11 @@ export default function Home({ onOpenAuth, user }) {
         throw new Error(data.message || "Không thể tải tài liệu");
       }
 
-      setDocuments(Array.isArray(data.items) ? data.items.map(normalizeDocument) : []);
+      setDocuments(
+        Array.isArray(data.items)
+          ? data.items.map(normalizeDocument).filter((document) => document.fileAvailable !== false)
+          : []
+      );
     } catch (error) {
       console.error(error);
       setDocuments([]);

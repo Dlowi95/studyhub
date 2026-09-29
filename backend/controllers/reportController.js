@@ -1,6 +1,10 @@
 const Report = require('../models/report');
 const Document = require('../models/Document');
 const Notification = require('../models/Notification');
+const {
+  notifyReportStatus,
+  notifyReportSubmitted,
+} = require('../utils/notificationService');
 
 // POST /api/reports
 exports.createReport = async (req, res) => {
@@ -41,6 +45,10 @@ exports.createReport = async (req, res) => {
       documentId,
       reporterId,
       reason,
+    });
+
+    await notifyReportSubmitted(report, document).catch((notificationError) => {
+      console.error('Không thể tạo thông báo báo cáo mới:', notificationError.message);
     });
 
     res.status(201).json({ report });
@@ -129,6 +137,7 @@ exports.updateReportStatus = async (req, res) => {
       return res.status(404).json({ message: 'Không tìm thấy báo cáo' });
     }
 
+    const previousStatus = report.status;
     report.status = status;
     report.handledBy = status === 'pending' ? null : req.user._id;
     report.resolvedAt = status === 'pending' ? null : new Date();
@@ -137,26 +146,10 @@ exports.updateReportStatus = async (req, res) => {
     }
     await report.save();
 
-    // Yêu cầu 4: Thông báo khi báo cáo được xử lý
-    if (status === 'resolved' || status === 'dismissed') {
-      try {
-        const isResolved = status === 'resolved';
-        const docTitle = report.documentId?.title || 'Tài liệu';
-        const feedbackText = report.adminFeedback ? ` Ghi chú từ quản trị viên: "${report.adminFeedback}".` : '';
-
-        await Notification.create({
-          recipient: report.reporterId,
-          type: isResolved ? 'report_resolved' : 'report_dismissed',
-          title: isResolved ? 'Báo cáo vi phạm đã được xử lý' : 'Báo cáo vi phạm đã được xem xét',
-          message: isResolved
-            ? `Báo cáo của bạn về tài liệu "${docTitle}" đã được chấp thuận và xử lý.${feedbackText}`
-            : `Báo cáo của bạn về tài liệu "${docTitle}" đã được xem xét và bỏ qua.${feedbackText}`,
-          link: '/my-reports',
-          relatedReportId: report._id,
-        });
-      } catch (notifErr) {
-        console.error('Lỗi khi tạo thông báo cho người dùng:', notifErr);
-      }
+    if (previousStatus !== status && (status === 'resolved' || status === 'dismissed')) {
+      await notifyReportStatus(report).catch((notificationError) => {
+        console.error('Không thể tạo thông báo trạng thái báo cáo:', notificationError.message);
+      });
     }
 
     res.json({ report });
@@ -173,6 +166,8 @@ exports.deleteReport = async (req, res) => {
     if (!report) {
       return res.status(404).json({ message: 'Không tìm thấy báo cáo' });
     }
+
+    await Notification.deleteMany({ relatedReportId: report._id });
 
     res.json({ message: 'Đã xóa báo cáo' });
   } catch (err) {

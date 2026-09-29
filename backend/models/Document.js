@@ -27,6 +27,16 @@ const documentSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    storageProvider: {
+      type: String,
+      enum: ["cloudinary", "gridfs", "local", "external"],
+      default: undefined,
+    },
+    storageKey: {
+      type: String,
+      default: undefined,
+      index: true,
+    },
     subjectId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Subject",

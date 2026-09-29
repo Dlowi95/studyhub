@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import DocumentDetailActions from "@/components/DocumentDetailActions";
 import DocumentDetailHeader from "@/components/DocumentDetailHeader";
@@ -51,6 +51,9 @@ const normalizeDocument = (doc) => ({
   downloadCount: doc.downloadCount || 0,
   avgRating: doc.avgRating || 0,
   uploaderId: doc.uploaderId,
+  fileAvailable: doc.fileAvailable,
+  fileIssue: doc.fileIssue || "",
+  storageProvider: doc.storageProvider || "",
 });
 
 export default function DocumentDetailPage() {
@@ -63,6 +66,7 @@ export default function DocumentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [avgRating, setAvgRating] = useState(null);
+  const [fileAvailability, setFileAvailability] = useState({ state: "checking", message: "" });
 
   // Report modal & status state
   const [reportModalOpen, setReportModalOpen] = useState(false);
@@ -107,6 +111,10 @@ export default function DocumentDetailPage() {
         const normalizedDoc = normalizeDocument(detailData);
         setDoc(normalizedDoc);
         setAvgRating(normalizedDoc.avgRating);
+        setFileAvailability({
+          state: normalizedDoc.fileAvailable === false ? "missing" : "checking",
+          message: normalizedDoc.fileIssue || "",
+        });
 
         // Check if current logged-in user already reported this document (Yêu cầu 5)
         const token = localStorage.getItem("token");
@@ -136,7 +144,7 @@ export default function DocumentDetailPage() {
             setRelatedDocs(
               relatedData.items
                 .map(normalizeDocument)
-                .filter((item) => item.id !== normalizedDoc.id)
+                .filter((item) => item.id !== normalizedDoc.id && item.fileAvailable !== false)
                 .slice(0, 3)
             );
           }
@@ -151,8 +159,24 @@ export default function DocumentDetailPage() {
     loadDocument();
   }, [id]);
 
+  const handleAvailabilityChange = useCallback((nextStatus) => {
+    setFileAvailability(nextStatus);
+  }, []);
+
   const handleDownload = async (docItem) => {
     if (!docItem?.fileUrl) return;
+
+    if (docItem.fileAvailable === false || fileAvailability.state === "missing") {
+      toast({
+        variant: "destructive",
+        title: "Tệp nguồn không còn khả dụng",
+        description:
+          fileAvailability.message ||
+          docItem.fileIssue ||
+          "Người đăng cần tải lại tài liệu trước khi bạn có thể xem hoặc tải xuống.",
+      });
+      return;
+    }
 
     const safeUrl = normalizeFileUrl(docItem.fileUrl);
     window.open(safeUrl, "_blank", "noopener,noreferrer");
@@ -188,6 +212,8 @@ export default function DocumentDetailPage() {
       // ignore network failure for counter update
     }
   };
+
+  const fileUnavailable = doc?.fileAvailable === false || fileAvailability.state === "missing";
 
   if (loading) {
     return (
@@ -240,18 +266,48 @@ export default function DocumentDetailPage() {
         <span className="text-slate-400 dark:text-slate-500 truncate max-w-[200px]">{doc.title}</span>
       </nav>
 
-      {/* 2. VERIFIED STATUS BANNER (EMERALD GREEN WITH PRETTY BORDER) */}
-      <div className="rounded-2xl border border-emerald-200/90 dark:border-emerald-800/60 bg-emerald-50/80 dark:bg-emerald-950/40 p-3.5 px-4 flex items-center justify-between gap-3 shadow-xs">
+      {/* 2. DOCUMENT STATUS BANNER */}
+      <div
+        className={`rounded-2xl border p-3.5 px-4 flex items-center justify-between gap-3 shadow-xs ${
+          fileUnavailable
+            ? "border-amber-300/90 bg-amber-50/90 dark:border-amber-800/70 dark:bg-amber-950/30"
+            : "border-emerald-200/90 bg-emerald-50/80 dark:border-emerald-800/60 dark:bg-emerald-950/40"
+        }`}
+      >
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-xl bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0 border border-emerald-200/80 dark:border-emerald-800/80">
-            <CheckCircle2 className="w-4 h-4" />
+          <div
+            className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border ${
+              fileUnavailable
+                ? "border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
+                : "border-emerald-200/80 bg-emerald-100 text-emerald-700 dark:border-emerald-800/80 dark:bg-emerald-900/60 dark:text-emerald-300"
+            }`}
+          >
+            {fileUnavailable ? (
+              <AlertTriangle className="w-4 h-4" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4" />
+            )}
           </div>
-          <p className="text-xs text-emerald-900 dark:text-emerald-200 font-medium">
-            Tài liệu học tập đã được kiểm duyệt an toàn — Sẵn sàng tải về và học tập.
+          <p
+            className={`text-xs font-medium ${
+              fileUnavailable
+                ? "text-amber-900 dark:text-amber-200"
+                : "text-emerald-900 dark:text-emerald-200"
+            }`}
+          >
+            {fileUnavailable
+              ? "Nội dung đã từng được duyệt, nhưng tệp nguồn hiện không còn khả dụng."
+              : "Tài liệu học tập đã được kiểm duyệt an toàn — Sẵn sàng tải về và học tập."}
           </p>
         </div>
-        <span className="hidden sm:inline-block text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-emerald-200/80 dark:border-emerald-800/80 shadow-2xs whitespace-nowrap">
-          Đã xác thực
+        <span
+          className={`hidden sm:inline-block text-[11px] font-semibold bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border shadow-2xs whitespace-nowrap ${
+            fileUnavailable
+              ? "border-amber-300/80 text-amber-700 dark:border-amber-800/80 dark:text-amber-300"
+              : "border-emerald-200/80 text-emerald-700 dark:border-emerald-800/80 dark:text-emerald-300"
+          }`}
+        >
+          {fileUnavailable ? "Cần tải lại tệp" : "Đã xác thực"}
         </span>
       </div>
 
@@ -291,7 +347,12 @@ export default function DocumentDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open(normalizeFileUrl(doc.fileUrl), "_blank", "noopener,noreferrer")}
+                  disabled={fileUnavailable}
+                  onClick={() => {
+                    if (!fileUnavailable) {
+                      window.open(normalizeFileUrl(doc.fileUrl), "_blank", "noopener,noreferrer");
+                    }
+                  }}
                   className="rounded-xl border-slate-200 dark:border-slate-700 text-xs font-semibold gap-1.5 h-8 hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
@@ -300,7 +361,11 @@ export default function DocumentDetailPage() {
               )}
             </div>
 
-            <DocumentPreview document={doc} onDownload={handleDownload} />
+            <DocumentPreview
+              document={doc}
+              onDownload={handleDownload}
+              onAvailabilityChange={handleAvailabilityChange}
+            />
           </div>
 
           {/* Reviews & Ratings Section (Real Data) */}
@@ -328,6 +393,8 @@ export default function DocumentDetailPage() {
               onReport={openReportModal}
               hasReported={hasReported}
               reportStatus={reportStatus}
+              fileUnavailable={fileUnavailable}
+              fileIssue={fileAvailability.message || doc.fileIssue}
             />
           </div>
 

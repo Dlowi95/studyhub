@@ -1,13 +1,20 @@
-const fs = require("fs");
 const path = require("path");
 const cloudinary = require("../config/cloudinary");
 const Document = require("../models/Document");
+const Notification = require("../models/Notification");
 const Review = require("../models/review");
 const Report = require("../models/report");
 const { deleteDocumentPhysicalFile } = require("../utils/fileCleanup");
 const { validateDocumentFile } = require("../utils/documentFileValidation");
-
-const uploadDir = path.join(__dirname, "..", "uploads");
+const { checkDocumentSource, saveBufferToGridFs } = require("../utils/documentStorage");
+const {
+  sendDocumentPreviewError,
+  sendSafeDocumentPreview,
+} = require("../utils/safeDocumentPreview");
+const {
+  notifyDocumentStatus,
+  notifyDocumentSubmitted,
+} = require("../utils/notificationService");
 
 const sanitizeFileName = (name = "") => {
   const extension = path.extname(name || "");
@@ -22,13 +29,16 @@ const sanitizeFileName = (name = "") => {
   return `${normalized}${extension}`;
 };
 
-const saveLocalFile = async (file, req) => {
-  fs.mkdirSync(uploadDir, { recursive: true });
-  const safeName = `${Date.now()}-${sanitizeFileName(file.originalname)}`;
-  const filePath = path.join(uploadDir, safeName);
-  await fs.promises.writeFile(filePath, file.buffer);
-  const baseUrl = process.env.BASE_URL || (req ? `${req.protocol}://${req.get("host")}` : `http://localhost:${process.env.PORT || 5000}`);
-  return `${baseUrl}/uploads/${encodeURIComponent(safeName)}`;
+const getRequestBaseUrl = (req) =>
+  String(process.env.BASE_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
+
+const saveToGridFs = async (file, req) => {
+  const storedFile = await saveBufferToGridFs(file);
+  return {
+    fileUrl: `${getRequestBaseUrl(req)}/api/files/${storedFile.storageKey}`,
+    storageProvider: "gridfs",
+    storageKey: storedFile.storageKey,
+  };
 };
 
 exports.uploadDocument = async (req, res) => {
@@ -51,7 +61,7 @@ exports.uploadDocument = async (req, res) => {
       return res.status(400).json({ message: fileValidation.message });
     }
 
-    let fileUrl = "";
+    let storedSource;
 
     if (cloudinary.isConfigured) {
       try {
@@ -71,22 +81,28 @@ exports.uploadDocument = async (req, res) => {
           stream.end(req.file.buffer);
         });
 
-        fileUrl = result.secure_url;
+        storedSource = {
+          fileUrl: result.secure_url,
+          storageProvider: "cloudinary",
+          storageKey: result.public_id,
+        };
       } catch (cloudError) {
-        console.warn("Cloudinary upload failed, falling back to local storage.", cloudError.message);
-        fileUrl = await saveLocalFile(req.file, req);
+        console.warn("Cloudinary upload failed, falling back to shared GridFS storage.", cloudError.message);
+        storedSource = await saveToGridFs(req.file, req);
       }
     } else {
-      fileUrl = await saveLocalFile(req.file, req);
+      storedSource = await saveToGridFs(req.file, req);
     }
 
     const doc = new Document({
       title,
       description: description || "",
-      fileUrl,
+      fileUrl: storedSource.fileUrl,
       fileName: req.file.originalname,
       fileType: fileValidation.fileType,
       fileSize: req.file.size || 0,
+      storageProvider: storedSource.storageProvider,
+      storageKey: storedSource.storageKey,
       subjectId: subjectId || null,
       subjectName: subjectName || "Khác",
       uploaderId: uploaderId || null,
@@ -99,6 +115,9 @@ exports.uploadDocument = async (req, res) => {
     });
 
     await doc.save();
+    await notifyDocumentSubmitted(doc).catch((notificationError) => {
+      console.error("Không thể tạo thông báo tài liệu mới:", notificationError.message);
+    });
 
     return res.status(201).json({
       message: "Upload tài liệu thành công",
@@ -163,8 +182,20 @@ exports.getDocuments = async (req, res) => {
       docsQuery.clone().countDocuments(),
     ]);
 
+    const items = await Promise.all(
+      docs.map(async (document) => {
+        const sourceStatus = await checkDocumentSource(document.fileUrl);
+        return {
+          ...document.toObject(),
+          fileAvailable: sourceStatus.available,
+          fileIssue: sourceStatus.issue,
+          storageProvider: document.storageProvider || sourceStatus.storage,
+        };
+      })
+    );
+
     return res.json({
-      items: docs,
+      items,
       page: pageNum,
       limit: perPage,
       total,
@@ -187,12 +218,30 @@ exports.getDocumentById = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy tài liệu" });
     }
 
-    return res.json(doc);
+    const sourceStatus = await checkDocumentSource(doc.fileUrl);
+    return res.json({
+      ...doc.toObject(),
+      fileAvailable: sourceStatus.available,
+      fileIssue: sourceStatus.issue,
+      storageProvider: doc.storageProvider || sourceStatus.storage,
+    });
   } catch (error) {
     return res.status(500).json({
       message: "Lỗi lấy tài liệu",
       error: error.message,
     });
+  }
+};
+
+exports.previewDocument = async (req, res) => {
+  try {
+    const document = await Document.findById(req.params.id).lean();
+    if (!document || document.status !== "approved") {
+      return res.status(404).json({ message: "Tài liệu không tồn tại hoặc chưa được công khai" });
+    }
+    return await sendSafeDocumentPreview(document, res);
+  } catch (error) {
+    return sendDocumentPreviewError(res, error);
   }
 };
 
@@ -204,14 +253,29 @@ exports.updateDocumentStatus = async (req, res) => {
       return res.status(400).json({ message: "Status không hợp lệ" });
     }
 
-    const doc = await Document.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true }
-    );
+    const doc = await Document.findById(req.params.id);
 
     if (!doc) {
       return res.status(404).json({ message: "Tài liệu không tồn tại" });
+    }
+
+    if (status === "approved") {
+      const sourceStatus = await checkDocumentSource(doc.fileUrl);
+      if (sourceStatus.available === false) {
+        return res.status(409).json({
+          message: sourceStatus.issue || "Không thể duyệt vì tệp nguồn không còn khả dụng",
+          code: "DOCUMENT_FILE_MISSING",
+        });
+      }
+    }
+
+    const previousStatus = doc.status;
+    doc.status = status;
+    await doc.save();
+    if (previousStatus !== status) {
+      await notifyDocumentStatus(doc, status).catch((notificationError) => {
+        console.error("Không thể tạo thông báo trạng thái tài liệu:", notificationError.message);
+      });
     }
 
     return res.json({
@@ -382,9 +446,10 @@ exports.deleteMyDocument = async (req, res) => {
 
     // Xóa file vật lý và cascade xóa reviews, reports liên quan
     await Promise.allSettled([
-      deleteDocumentPhysicalFile(doc.fileUrl),
+      deleteDocumentPhysicalFile(doc),
       Review.deleteMany({ documentId: id }),
       Report.deleteMany({ documentId: id }),
+      Notification.deleteMany({ relatedDocumentId: id }),
     ]);
 
     await Document.findByIdAndDelete(id);

@@ -309,7 +309,12 @@ const getDocumentExtension = (doc = {}) => {
 };
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState("overview"); // "overview" | "users" | "documents" | "subjects" | "pending" | "reports"
+  const [activeTab, setActiveTab] = useState(() => {
+    const requestedTab = new URLSearchParams(window.location.search).get("tab");
+    return ["overview", "users", "documents", "subjects", "pending", "reports"].includes(requestedTab)
+      ? requestedTab
+      : "overview";
+  });
   const [users, setUsers] = useState([]);
   const [allDocs, setAllDocs] = useState([]);
   const [pendingDocs, setPendingDocs] = useState([]);
@@ -1899,8 +1904,13 @@ export default function AdminDashboard() {
                         })
                         .map((doc) => (
                           <TableRow key={doc._id || doc.id} className="border-zinc-800/60 hover:bg-zinc-900/40">
-                            <TableCell className="font-semibold text-white max-w-xs truncate" title={doc.title}>
-                              {doc.title}
+                            <TableCell className="font-semibold text-white max-w-xs" title={doc.title}>
+                              <div className="truncate">{doc.title}</div>
+                              {doc.fileAvailable === false && (
+                                <span className="mt-1 inline-flex text-[10px] font-medium text-red-400">
+                                  Thiếu tệp nguồn
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline" className="bg-zinc-900 text-zinc-300 border-zinc-800 text-[10px]">
@@ -1931,8 +1941,9 @@ export default function AdminDashboard() {
                                   <Button
                                     size="sm"
                                     variant="outline"
+                                    disabled={doc.fileAvailable === false}
                                     onClick={() => handleOpenPreview(doc)}
-                                    title="Xem trước an toàn"
+                                    title={doc.fileAvailable === false ? doc.fileIssue : "Xem trước an toàn"}
                                     className="h-7 px-2 border-zinc-800 text-zinc-300 rounded-lg"
                                   >
                                     <Eye className="w-3.5 h-3.5" />
@@ -2051,8 +2062,13 @@ export default function AdminDashboard() {
                       <TableBody className="text-xs">
                         {pendingDocs.map((doc) => (
                           <TableRow key={doc._id || doc.id} className="border-zinc-800/60 hover:bg-zinc-900/40">
-                            <TableCell className="font-semibold text-white max-w-xs truncate" title={doc.title}>
-                              {doc.title}
+                            <TableCell className="font-semibold text-white max-w-xs" title={doc.title}>
+                              <div className="truncate">{doc.title}</div>
+                              {doc.fileAvailable === false && (
+                                <span className="mt-1 inline-flex text-[10px] font-medium text-red-400">
+                                  Thiếu tệp nguồn
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline" className="bg-emerald-500/10 text-emerald-300 border-emerald-500/30 text-[10px]">
@@ -2075,8 +2091,9 @@ export default function AdminDashboard() {
                                   <Button
                                     size="sm"
                                     variant="outline"
+                                    disabled={doc.fileAvailable === false}
                                     onClick={() => handleOpenPreview(doc)}
-                                    title="Xem trước an toàn"
+                                    title={doc.fileAvailable === false ? doc.fileIssue : "Xem trước an toàn"}
                                     className="h-8 px-2.5 border-zinc-800 text-zinc-300 hover:bg-zinc-800 rounded-lg"
                                   >
                                     <Eye className="w-3.5 h-3.5" />
@@ -2084,6 +2101,7 @@ export default function AdminDashboard() {
                                 )}
                                 <Button
                                   size="sm"
+                                  disabled={doc.fileAvailable === false}
                                   onClick={() => handleApproveDoc(doc._id || doc.id)}
                                   className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
                                 >
