@@ -25,11 +25,11 @@ const toastVariants = cva(
     variants: {
       variant: {
         default:
-          "border-emerald-200/90 bg-emerald-50/95 text-emerald-950 shadow-emerald-900/10 ring-1 ring-emerald-500/20",
+          "border-emerald-200/90 bg-emerald-50/95 text-emerald-950 dark:border-emerald-800/80 dark:bg-slate-900/95 dark:text-emerald-200 shadow-emerald-900/10 ring-1 ring-emerald-500/20",
         success:
-          "border-emerald-300 bg-emerald-50/95 text-emerald-950 shadow-emerald-600/10 ring-1 ring-emerald-500/20",
+          "border-emerald-300 bg-emerald-50/95 text-emerald-950 dark:border-emerald-800 dark:bg-slate-900/95 dark:text-emerald-200 shadow-emerald-600/10 ring-1 ring-emerald-500/20",
         destructive:
-          "border-rose-200 bg-rose-50/95 text-rose-950 shadow-rose-600/10 ring-1 ring-rose-500/20",
+          "border-rose-200 bg-rose-50/95 text-rose-950 dark:border-rose-800/80 dark:bg-slate-900/95 dark:text-rose-200 shadow-rose-600/10 ring-1 ring-rose-500/20",
       },
     },
     defaultVariants: {

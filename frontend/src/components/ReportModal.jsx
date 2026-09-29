@@ -14,11 +14,12 @@ export default function ReportModal({ isOpen, onClose, document: doc, onSuccess 
   const [apiError, setApiError] = useState("");
 
   const reportReasons = [
-    { value: "wrong_subject", label: "Sai học phần / môn học" },
-    { value: "copyright", label: "Vi phạm bản quyền / Tài liệu cấm chia sẻ" },
-    { value: "incorrect_content", label: "Nội dung sai lệch, đề thi lỗi đáp án" },
-    { value: "poor_quality", label: "Chất lượng file kém, mờ, không đọc được" },
-    { value: "other", label: "Lý do khác" },
+    { value: "wrong_subject", label: "Sai học phần / môn học", desc: "Tài liệu được xếp nhầm môn học hoặc ngành đào tạo" },
+    { value: "copyright", label: "Vi phạm bản quyền / Tài liệu cấm", desc: "Tài liệu thuộc sở hữu riêng hoặc bị cấm phát tán" },
+    { value: "incorrect_content", label: "Nội dung sai lệch, đề thi lỗi đáp án", desc: "Nội dung không chính xác, gây nhầm lẫn khi ôn tập" },
+    { value: "poor_quality", label: "Chất lượng file kém, mờ, không đọc được", desc: "File bị lỗi font, mờ nhòe hoặc mất trang" },
+    { value: "spam", label: "Spam, quảng cáo thương mại hoặc lừa đảo", desc: "Tài liệu chứa đường link rác hoặc quảng cáo" },
+    { value: "other", label: "Lý do khác", desc: "Các vấn đề vi phạm khác (cần ghi rõ chi tiết bên dưới)" },
   ];
 
   const handleSubmit = async (e) => {
@@ -27,11 +28,15 @@ export default function ReportModal({ isOpen, onClose, document: doc, onSuccess 
 
     const token = localStorage.getItem("token");
     if (!token) {
-      setApiError("Bạn cần đăng nhập để gửi báo cáo.");
+      setApiError("Bạn cần đăng nhập để gửi báo cáo vi phạm.");
       return;
     }
 
-    // Tìm nhãn tiếng Việt tương ứng với value đã chọn (bắt buộc khai báo TRƯỚC khi dùng bên dưới)
+    if (reason === "other" && !details.trim()) {
+      setApiError("Vui lòng ghi rõ mô tả chi tiết khi bạn chọn 'Lý do khác'.");
+      return;
+    }
+
     const reasonLabel = reportReasons.find((r) => r.value === reason)?.label || reason;
 
     setLoading(true);
@@ -45,7 +50,7 @@ export default function ReportModal({ isOpen, onClose, document: doc, onSuccess 
         },
         body: JSON.stringify({
           documentId: doc.id || doc._id,
-          reason: details.trim() ? `${reasonLabel}: ${details.trim()}` : reasonLabel,
+          reason: details.trim() ? `${reasonLabel} — ${details.trim()}` : reasonLabel,
         }),
       });
       const data = await res.json();
@@ -54,7 +59,7 @@ export default function ReportModal({ isOpen, onClose, document: doc, onSuccess 
         throw new Error(data.message || "Gửi báo cáo thất bại");
       }
 
-      onSuccess?.(doc.id || doc._id);
+      onSuccess?.(doc.id || doc._id, data.report);
       setSubmitted(true);
       setTimeout(() => {
         setSubmitted(false);
@@ -99,24 +104,36 @@ export default function ReportModal({ isOpen, onClose, document: doc, onSuccess 
               </div>
             )}
             <div className="space-y-2 text-left">
-              <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Lý do báo cáo</Label>
-              <div className="space-y-1.5">
-                {reportReasons.map((item) => (
-                  <label
-                    key={item.value}
-                    className="flex items-center gap-2.5 p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-xs text-slate-700 dark:text-slate-300 transition-colors"
-                  >
-                    <input
-                      type="radio"
-                      name="reportReason"
-                      value={item.value}
-                      checked={reason === item.value}
-                      onChange={(e) => setReason(e.target.value)}
-                      className="text-primary focus:ring-primary h-3.5 w-3.5"
-                    />
-                    <span>{item.label}</span>
-                  </label>
-                ))}
+              <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Lý do báo cáo vi phạm <span className="text-destructive">*</span>
+              </Label>
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {reportReasons.map((item) => {
+                  const isChecked = reason === item.value;
+                  return (
+                    <label
+                      key={item.value}
+                      className={`flex items-start gap-3 p-2.5 rounded-xl border cursor-pointer text-xs transition-all ${
+                        isChecked
+                          ? "border-primary bg-primary/5 dark:bg-primary/10 shadow-xs"
+                          : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="reportReason"
+                        value={item.value}
+                        checked={isChecked}
+                        onChange={(e) => setReason(e.target.value)}
+                        className="mt-0.5 text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <div className="space-y-0.5">
+                        <div className="font-semibold text-slate-900 dark:text-slate-100">{item.label}</div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">{item.desc}</div>
+                      </div>
+                    </label>
+                  );
+                })}
               </div>
             </div>
 

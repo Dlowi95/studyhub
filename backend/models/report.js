@@ -31,6 +31,11 @@ const reportSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    adminFeedback: {
+      type: String,
+      default: '',
+      trim: true,
+    },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

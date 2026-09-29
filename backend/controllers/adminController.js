@@ -222,3 +222,49 @@ exports.updateUserStatus = async (req, res) => {
     res.status(500).json({ message: "Server error updating user status", error: error.message });
   }
 };
+
+// PUT /api/admin/users/:id/role (Yêu cầu 3)
+exports.updateUserRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    const validRoles = ["student", "moderator", "admin"];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({
+        message: "Vai trò không hợp lệ. Chỉ chấp nhận: 'student', 'moderator' hoặc 'admin'",
+      });
+    }
+
+    // Không cho phép Admin tự đổi vai trò của chính mình
+    if (req.user._id.toString() === id) {
+      return res.status(400).json({
+        message: "Bạn không thể tự thay đổi vai trò của chính mình",
+      });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
+    }
+
+    user.role = role;
+    await user.save();
+
+    res.json({
+      message: `Đã cập nhật vai trò người dùng thành '${role}' thành công`,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Lỗi server khi cập nhật vai trò người dùng",
+      error: error.message,
+    });
+  }
+};

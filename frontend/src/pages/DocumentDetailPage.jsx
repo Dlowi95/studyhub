@@ -71,11 +71,23 @@ export default function DocumentDetailPage() {
   const [error, setError] = useState("");
   const [avgRating, setAvgRating] = useState(null);
 
-  // Report modal state
+  // Report modal & status state
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportTargetDoc, setReportTargetDoc] = useState(null);
+  const [hasReported, setHasReported] = useState(false);
+  const [reportStatus, setReportStatus] = useState(null);
 
   const openReportModal = (targetDoc) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast({
+        title: "Yêu cầu đăng nhập",
+        description: "Bạn cần đăng nhập tài khoản StudyHub để gửi báo cáo vi phạm.",
+        variant: "destructive",
+      });
+      window.dispatchEvent(new CustomEvent("openAuthModal", { detail: { tab: "login" } }));
+      return;
+    }
     setReportTargetDoc(targetDoc);
     setReportModalOpen(true);
   };
@@ -102,6 +114,23 @@ export default function DocumentDetailPage() {
         const normalizedDoc = normalizeDocument(detailData);
         setDoc(normalizedDoc);
         setAvgRating(normalizedDoc.avgRating);
+
+        // Check if current logged-in user already reported this document (Yêu cầu 5)
+        const token = localStorage.getItem("token");
+        if (token) {
+          try {
+            const checkRes = await fetch(`${apiUrl}/reports/check/${id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (checkRes.ok) {
+              const checkData = await checkRes.json();
+              setHasReported(checkData.hasReported);
+              setReportStatus(checkData.status);
+            }
+          } catch {
+            // non-blocking check
+          }
+        }
 
         // Fetch related documents in the same subject
         if (normalizedDoc.subjectName) {
@@ -338,6 +367,8 @@ export default function DocumentDetailPage() {
               doc={doc}
               onDownload={handleDownload}
               onReport={openReportModal}
+              hasReported={hasReported}
+              reportStatus={reportStatus}
             />
           </div>
 
@@ -380,6 +411,14 @@ export default function DocumentDetailPage() {
         isOpen={reportModalOpen}
         onClose={closeReportModal}
         document={reportTargetDoc}
+        onSuccess={(docId, report) => {
+          setHasReported(true);
+          setReportStatus(report?.status || "pending");
+          toast({
+            title: "Báo cáo đã được ghi nhận",
+            description: "Cảm ơn bạn đã đóng góp xây dựng thư viện học tập an toàn.",
+          });
+        }}
       />
     </div>
   );

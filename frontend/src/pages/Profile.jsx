@@ -8,6 +8,7 @@ import {
   Mail,
   Shield,
   ShieldCheck,
+  ShieldAlert,
   Calendar,
   UploadCloud,
   Bookmark,
@@ -456,10 +457,20 @@ export default function Profile() {
 
                 <Badge
                   variant="outline"
-                  className="bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border-emerald-200/80 dark:border-emerald-800/60 text-xs px-2.5 py-0.5 font-semibold capitalize rounded-lg"
+                  className={`text-xs px-2.5 py-0.5 font-semibold capitalize rounded-lg ${
+                    user?.role === "admin"
+                      ? "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200/80 dark:border-rose-800/60"
+                      : user?.role === "moderator"
+                      ? "bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200/80 dark:border-indigo-800/60"
+                      : "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border-emerald-200/80 dark:border-emerald-800/60"
+                  }`}
                 >
-                  <ShieldCheck className="w-3.5 h-3.5 mr-1 text-emerald-600 dark:text-emerald-400 inline" />
-                  {user?.role === "admin" ? "Quản trị viên" : "Sinh viên"}
+                  <ShieldCheck className="w-3.5 h-3.5 mr-1 inline" />
+                  {user?.role === "admin"
+                    ? "Quản trị viên"
+                    : user?.role === "moderator"
+                    ? "Kiểm duyệt viên"
+                    : "Sinh viên"}
                 </Badge>
               </div>
 
@@ -494,22 +505,32 @@ export default function Profile() {
               Đăng tài liệu mới
             </Button>
 
-            {user?.role === "admin" && (
+            {(user?.role === "admin" || user?.role === "moderator") && (
               <Link to="/admin">
                 <Button
                   variant="outline"
                   className="rounded-xl border-emerald-300 dark:border-emerald-700 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-xs md:text-sm font-semibold gap-1.5"
                 >
                   <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  Trang Admin
+                  {user?.role === "admin" ? "Trang Admin" : "Trang Kiểm duyệt"}
                 </Button>
               </Link>
             )}
 
+            <Link to="/my-reports">
+              <Button
+                variant="outline"
+                className="rounded-xl border-amber-300 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-xs md:text-sm font-semibold gap-1.5 cursor-pointer"
+              >
+                <ShieldAlert className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                Báo cáo của tôi
+              </Button>
+            </Link>
+
             <Button
               onClick={handleLogout}
               variant="outline"
-              className="rounded-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 hover:border-red-200 dark:hover:border-red-900/50 text-xs md:text-sm font-semibold transition-all gap-1.5"
+              className="rounded-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 hover:border-red-200 dark:hover:border-red-900/50 text-xs md:text-sm font-semibold transition-all gap-1.5 cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
               Đăng xuất
@@ -597,11 +618,11 @@ export default function Profile() {
       <div className="space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 pb-4">
           {/* Modern Pill Segmented Control */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl w-fit">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl max-w-full overflow-x-auto no-scrollbar">
             <button
               type="button"
               onClick={() => setActiveTab("uploads")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
                 activeTab === "uploads"
                   ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -623,7 +644,7 @@ export default function Profile() {
             <button
               type="button"
               onClick={() => setActiveTab("saved")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
                 activeTab === "saved"
                   ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -641,7 +662,7 @@ export default function Profile() {
             <button
               type="button"
               onClick={() => setActiveTab("downloads")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
                 activeTab === "downloads"
                   ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -659,7 +680,7 @@ export default function Profile() {
             <button
               type="button"
               onClick={() => setActiveTab("account")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
                 activeTab === "account"
                   ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"

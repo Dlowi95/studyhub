@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UploadCloud, CheckCircle2, FileText, AlertCircle, Loader2, ShieldCheck, ArrowRight, ArrowLeft } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
+  const { toast } = useToast();
   const [step, setStep] = useState(1); // 1: Chọn file, 2: Điền thông tin, 3: Xác nhận gửi duyệt
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
@@ -33,6 +35,11 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
     if (selectedFile) {
       if (selectedFile.size > 25 * 1024 * 1024) {
         setError("Dung lượng file tối đa là 25MB.");
+        toast({
+          variant: "destructive",
+          title: "File quá dung lượng",
+          description: "Dung lượng tệp tải lên tối đa là 25MB. Vui lòng chọn tệp nhỏ hơn.",
+        });
         return;
       }
       setError("");
@@ -101,6 +108,10 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
 
       setLoading(false);
       setSuccess(true);
+      toast({
+        title: "Đã gửi tài liệu thành công!",
+        description: "Tài liệu của bạn đã được chuyển đến ban quản trị để kiểm duyệt trước khi công khai.",
+      });
       window.dispatchEvent(new CustomEvent("documentUploaded", { detail: data.document }));
       onUploadSuccess?.(data.document);
 
@@ -116,6 +127,11 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
     } catch (err) {
       setLoading(false);
       setError(err.message || "Không thể upload tài liệu");
+      toast({
+        variant: "destructive",
+        title: "Lỗi tải lên tài liệu",
+        description: err.message || "Không thể upload tài liệu lúc này.",
+      });
     }
   };
 

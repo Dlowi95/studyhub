@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
+  const { toast } = useToast();
   const [tab, setTab] = useState(initialTab); // "login" | "register"
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -59,6 +61,11 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
         window.dispatchEvent(new Event("authChange"));
 
         setSuccess("Đăng nhập thành công");
+        toast({
+          title: "Đăng nhập thành công",
+          description: `Chào mừng ${data.user?.name || "bạn"} quay trở lại StudyHub!`,
+        });
+
         setTimeout(() => {
           onClose();
           if (data.user?.role === "admin") {
@@ -82,12 +89,22 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
         window.dispatchEvent(new Event("authChange"));
 
         setSuccess("Đăng ký tài khoản thành công");
+        toast({
+          title: "Đăng ký tài khoản thành công",
+          description: "Chào mừng bạn gia nhập cộng đồng học tập StudyHub!",
+        });
+
         setTimeout(() => {
           onClose();
         }, 800);
       }
     } catch (err) {
       setError(err.message);
+      toast({
+        variant: "destructive",
+        title: tab === "login" ? "Đăng nhập thất bại" : "Đăng ký thất bại",
+        description: err.message || "Đã xảy ra lỗi, vui lòng thử lại.",
+      });
     } finally {
       setLoading(false);
     }
