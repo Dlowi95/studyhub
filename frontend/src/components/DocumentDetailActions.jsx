@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Download, FileText, MessageSquareWarning, Bookmark, Share2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { normalizeFileUrl } from "@/lib/file-url";
 
 export default function DocumentDetailActions({ doc, onDownload, onReport, hasReported = false, reportStatus = null }) {
   const { toast } = useToast();
@@ -107,7 +108,7 @@ export default function DocumentDetailActions({ doc, onDownload, onReport, hasRe
           <Button
             type="button"
             variant="outline"
-            onClick={() => window.open(encodeURI(doc.fileUrl), "_blank", "noopener,noreferrer")}
+            onClick={() => window.open(normalizeFileUrl(doc.fileUrl), "_blank", "noopener,noreferrer")}
             className="w-full sm:flex-1 min-w-0 rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 h-11 px-4 text-slate-700 dark:text-slate-200 font-semibold text-sm gap-2"
           >
             <FileText className="w-4 h-4 text-slate-500 dark:text-slate-400" />

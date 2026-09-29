@@ -54,7 +54,7 @@ exports.uploadDocument = async (req, res) => {
             {
               resource_type: "raw",
               folder: "studyhub/documents",
-              public_id: `${Date.now()}-${req.file.originalname.replace(/\.[^/.]+$/, "")}`,
+              public_id: `${Date.now()}-${sanitizeFileName(req.file.originalname)}`,
             },
             (error, uploadResult) => {
               if (error) reject(error);

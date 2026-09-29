@@ -4,14 +4,15 @@ import DocumentDetailActions from "@/components/DocumentDetailActions";
 import DocumentDetailHeader from "@/components/DocumentDetailHeader";
 import DocumentDetailMeta from "@/components/DocumentDetailMeta";
 import DocumentDetailReviews from "@/components/DocumentDetailReviews";
+import DocumentPreview from "@/components/DocumentPreview";
 import ReportModal from "@/components/ReportModal";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { normalizeFileUrl } from "@/lib/file-url";
 import {
   ChevronRight,
   FileText,
   AlertTriangle,
-  Download,
   CheckCircle2,
   ExternalLink,
 } from "lucide-react";
@@ -153,7 +154,7 @@ export default function DocumentDetailPage() {
   const handleDownload = async (docItem) => {
     if (!docItem?.fileUrl) return;
 
-    const safeUrl = encodeURI(docItem.fileUrl);
+    const safeUrl = normalizeFileUrl(docItem.fileUrl);
     window.open(safeUrl, "_blank", "noopener,noreferrer");
 
     // Record to local download history
@@ -221,8 +222,6 @@ export default function DocumentDetailPage() {
       </div>
     );
   }
-
-  const isPdf = doc.fileUrl?.toLowerCase().includes(".pdf");
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6 text-left pb-16">
@@ -292,7 +291,7 @@ export default function DocumentDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open(encodeURI(doc.fileUrl), "_blank", "noopener,noreferrer")}
+                  onClick={() => window.open(normalizeFileUrl(doc.fileUrl), "_blank", "noopener,noreferrer")}
                   className="rounded-xl border-slate-200 dark:border-slate-700 text-xs font-semibold gap-1.5 h-8 hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
@@ -301,41 +300,7 @@ export default function DocumentDetailPage() {
               )}
             </div>
 
-            {isPdf && doc.fileUrl ? (
-              <div className="w-full h-[550px] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-950">
-                <iframe
-                  src={`${encodeURI(doc.fileUrl)}#toolbar=0`}
-                  title={doc.title}
-                  className="w-full h-full"
-                />
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 p-8 md:p-12 text-center space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto shadow-xs">
-                  <FileText className="w-8 h-8" />
-                </div>
-                <div className="max-w-md mx-auto space-y-1">
-                  <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-                    {doc.fileName || doc.title}
-                  </h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Định dạng file: <span className="font-semibold uppercase">{doc.type}</span> • Dung lượng: {doc.size}
-                  </p>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 pt-1">
-                    Định dạng Word/Office hỗ trợ xem nhanh qua bản tải về hoặc ứng dụng Office trên thiết bị.
-                  </p>
-                </div>
-                <div className="pt-2">
-                  <Button
-                    onClick={() => handleDownload(doc)}
-                    className="bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-semibold px-4 h-9 gap-1.5 shadow-xs"
-                  >
-                    <Download className="w-4 h-4" />
-                    Tải về để xem toàn bộ nội dung
-                  </Button>
-                </div>
-              </div>
-            )}
+            <DocumentPreview document={doc} onDownload={handleDownload} />
           </div>
 
           {/* Reviews & Ratings Section (Real Data) */}

@@ -66,6 +66,27 @@
   }
 }
 
+.studyhub-docx-preview .studyhub-docx-wrapper {
+  min-height: 100%;
+  padding: 1rem;
+  background: rgb(241 245 249);
+}
+
+.dark .studyhub-docx-preview .studyhub-docx-wrapper {
+  background: rgb(2 6 23);
+}
+
+.studyhub-docx-preview .studyhub-docx-wrapper > section.studyhub-docx {
+  margin: 0 auto 1rem;
+  box-shadow: 0 4px 18px rgb(15 23 42 / 12%);
+}
+
+@media (max-width: 640px) {
+  .studyhub-docx-preview .studyhub-docx-wrapper {
+    padding: 0.5rem;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
