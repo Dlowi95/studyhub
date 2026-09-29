@@ -63,6 +63,7 @@ export default function DocumentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [avgRating, setAvgRating] = useState(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Report modal & status state
   const [reportModalOpen, setReportModalOpen] = useState(false);
@@ -152,12 +153,51 @@ export default function DocumentDetailPage() {
   }, [id]);
 
   const handleDownload = async (docItem) => {
-    if (!docItem?.fileUrl) return;
+    if (!docItem?.fileUrl || isDownloading) return;
 
     const safeUrl = normalizeFileUrl(docItem.fileUrl);
-    window.open(safeUrl, "_blank", "noopener,noreferrer");
+    const supportedExtensions = new Set(["pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "txt"]);
+    const documentType = String(docItem.type || "").toLowerCase();
+    let downloadName = (docItem.fileName || docItem.title || "tai-lieu").trim();
 
-    // Record to local download history
+    if (!/\.[a-z0-9]{1,8}$/i.test(downloadName) && supportedExtensions.has(documentType)) {
+      downloadName = `${downloadName}.${documentType}`;
+    }
+
+    downloadName = downloadName.replace(/[\\/:*?"<>|]/g, "-");
+    setIsDownloading(true);
+
+    try {
+      const fileResponse = await fetch(safeUrl);
+      if (!fileResponse.ok) {
+        throw new Error(`Máy chủ trả về lỗi ${fileResponse.status}`);
+      }
+
+      const fileBlob = await fileResponse.blob();
+      if (!fileBlob.size) {
+        throw new Error("File tải về không có dữ liệu");
+      }
+
+      const objectUrl = URL.createObjectURL(fileBlob);
+      const downloadLink = document.createElement("a");
+      downloadLink.href = objectUrl;
+      downloadLink.download = downloadName;
+      downloadLink.style.display = "none";
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (downloadError) {
+      toast({
+        variant: "destructive",
+        title: "Không thể tải tài liệu",
+        description: downloadError.message || "Vui lòng thử lại sau.",
+      });
+      setIsDownloading(false);
+      return;
+    }
+
+    // Local history is optional and must not turn a successful download into an error.
     try {
       const history = JSON.parse(localStorage.getItem("studyhub_downloads") || "[]");
       if (!history.some((h) => h.id === docItem.id)) {
@@ -172,21 +212,31 @@ export default function DocumentDetailPage() {
         localStorage.setItem("studyhub_downloads", JSON.stringify(history.slice(0, 50)));
       }
     } catch {
-      // Local download history is optional and must not block the download.
+      // Ignore unavailable or invalid browser storage.
     }
 
     try {
-      await fetch(`${apiUrl}/documents/${docItem.id}/download`, { method: "POST" });
-      setDoc((prev) =>
-        prev ? { ...prev, downloadCount: (prev.downloadCount || 0) + 1 } : prev
-      );
-      toast({
-        title: "Bắt đầu tải xuống",
-        description: `Đang tải file ${docItem.fileName || docItem.title}`,
-      });
+      const counterResponse = await fetch(`${apiUrl}/documents/${docItem.id}/download`, { method: "POST" });
+      if (counterResponse.ok) {
+        const counterData = await counterResponse.json();
+        setDoc((prev) =>
+          prev
+            ? {
+                ...prev,
+                downloadCount: counterData.document?.downloadCount ?? (prev.downloadCount || 0) + 1,
+              }
+            : prev
+        );
+      }
     } catch {
-      // ignore network failure for counter update
+      // A counter failure must not block a completed file download.
     }
+
+    toast({
+      title: "Đã tải tài liệu",
+      description: downloadName,
+    });
+    setIsDownloading(false);
   };
 
   if (loading) {
@@ -325,6 +375,7 @@ export default function DocumentDetailPage() {
             <DocumentDetailActions
               doc={doc}
               onDownload={handleDownload}
+              isDownloading={isDownloading}
               onReport={openReportModal}
               hasReported={hasReported}
               reportStatus={reportStatus}

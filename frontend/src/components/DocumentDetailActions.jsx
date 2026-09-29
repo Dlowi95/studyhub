@@ -1,10 +1,17 @@
 import { useState, useEffect } from "react";
-import { Download, FileText, MessageSquareWarning, Bookmark, Share2, Check } from "lucide-react";
+import { Download, FileText, MessageSquareWarning, Bookmark, Share2, Check, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { normalizeFileUrl } from "@/lib/file-url";
 
-export default function DocumentDetailActions({ doc, onDownload, onReport, hasReported = false, reportStatus = null }) {
+export default function DocumentDetailActions({
+  doc,
+  onDownload,
+  onReport,
+  hasReported = false,
+  reportStatus = null,
+  isDownloading = false,
+}) {
   const { toast } = useToast();
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -92,15 +99,15 @@ export default function DocumentDetailActions({ doc, onDownload, onReport, hasRe
         <Button
           type="button"
           onClick={() => onDownload?.(doc)}
+          disabled={isDownloading}
           className="w-full sm:flex-1 min-w-0 bg-primary hover:bg-primary/90 text-white rounded-xl h-11 px-4 font-bold shadow-xs active:scale-[0.98] transition-all gap-2 text-sm"
         >
-          <Download className="w-4 h-4" />
-          <span>Tải xuống tài liệu</span>
-          {doc.downloadCount > 0 && (
-            <span className="ml-1 px-2 py-0.5 rounded-full bg-white/20 text-xs font-semibold">
-              {doc.downloadCount}
-            </span>
+          {isDownloading ? (
+            <LoaderCircle className="w-4 h-4 animate-spin" />
+          ) : (
+            <Download className="w-4 h-4" />
           )}
+          <span>{isDownloading ? "Đang tải..." : "Tải xuống tài liệu"}</span>
         </Button>
 
         {/* View in new tab */}
