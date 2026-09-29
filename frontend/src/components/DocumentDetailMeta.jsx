@@ -22,15 +22,16 @@ export default function DocumentDetailMeta({ doc }) {
         </div>
 
         {/* Downloads */}
-        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 hover:border-blue-200 dark:hover:border-blue-800/60 transition-all shadow-xs">
-          <div className="mb-1.5 flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-xs font-semibold">
-            <Download className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+        <div className="relative overflow-hidden rounded-2xl border border-red-200/80 bg-red-50/40 p-4 shadow-xs transition-all hover:border-red-300 hover:shadow-sm dark:border-red-950/80 dark:bg-red-950/15 dark:hover:border-red-900/80">
+          <div className="pointer-events-none absolute -right-5 -top-6 h-16 w-16 rounded-full bg-red-400/10 blur-xl dark:bg-red-500/10" />
+          <div className="relative mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+            <Download className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
             Lượt tải
           </div>
-          <div className="text-xl md:text-2xl font-extrabold text-blue-700 dark:text-blue-400">
+          <div className="relative text-2xl font-black text-red-600 dark:text-red-400 md:text-3xl">
             {doc.downloadCount || 0}
           </div>
-          <span className="text-[11px] text-slate-400 dark:text-slate-500">Lần tải về máy</span>
+          <span className="relative text-[11px] font-medium text-red-500/80 dark:text-red-400/70">Lần tải về máy</span>
         </div>
 
         {/* Rating - NO MOCK 4.8 */}

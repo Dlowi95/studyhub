@@ -381,21 +381,30 @@ export default function DocumentDetailPage() {
         {/* RIGHT COLUMN: STICKY SIDEBAR (1 COL) */}
         <div className="space-y-6 lg:sticky lg:top-20">
           {/* Quick Actions Card */}
-          <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-5">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Tác vụ tài liệu</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Tải về hoặc lưu lại để ôn tập.</p>
+          <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_18px_45px_-32px_rgba(15,23,42,0.45)] dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center gap-3 border-b border-slate-100 bg-gradient-to-br from-slate-50 to-emerald-50/50 px-5 py-4 dark:border-slate-800 dark:from-slate-900 dark:to-emerald-950/20">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-950/70 dark:text-emerald-300 dark:ring-emerald-900">
+                <FileText className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Tác vụ tài liệu</h3>
+                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                  Xem, tải về hoặc lưu lại để ôn tập.
+                </p>
+              </div>
             </div>
 
-            <DocumentDetailActions
-              doc={doc}
-              onDownload={handleDownload}
-              onReport={openReportModal}
-              hasReported={hasReported}
-              reportStatus={reportStatus}
-              fileUnavailable={fileUnavailable}
-              fileIssue={fileAvailability.message || doc.fileIssue}
-            />
+            <div className="p-5">
+              <DocumentDetailActions
+                doc={doc}
+                onDownload={handleDownload}
+                onReport={openReportModal}
+                hasReported={hasReported}
+                reportStatus={reportStatus}
+                fileUnavailable={fileUnavailable}
+                fileIssue={fileAvailability.message || doc.fileIssue}
+              />
+            </div>
           </div>
 
           {/* Related Documents in Subject */}
