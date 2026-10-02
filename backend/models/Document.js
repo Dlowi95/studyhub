@@ -60,6 +60,7 @@ const documentSchema = new mongoose.Schema(
       enum: ["pending", "approved", "rejected"],
       default: "pending",
     },
+    moderationNote: { type: String, trim: true, maxlength: 2000, default: "" },
     viewCount: {
       type: Number,
       default: 0,

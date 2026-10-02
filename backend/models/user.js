@@ -32,6 +32,10 @@ const userSchema = new mongoose.Schema(
       enum: ["active", "blocked"],
       default: "active",
     },
+    bookmarkedDocuments: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Document",
+    }],
   },
   {
     timestamps: true,

@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import BrandMark from "./BrandMark";
 
 export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
   const { toast } = useToast();
@@ -188,18 +189,19 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xl rounded-2xl">
+      <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border-border bg-card text-foreground shadow-xl rounded-2xl">
         {/* Modal Top Header */}
-        <div className="bg-slate-50 dark:bg-slate-800/70 p-6 pb-4 border-b border-slate-200/80 dark:border-slate-800">
+        <div className="bg-muted p-6 pb-4 border-b border-border/80 ">
+          <div className="mb-5"><BrandMark /></div>
           {/* Tab Switcher */}
-          <div className="flex bg-slate-200/70 dark:bg-slate-800 p-1 rounded-lg mb-4">
+          <div className="flex bg-card/70 p-1 rounded-lg mb-4">
             <button
               type="button"
               onClick={() => switchTab("login")}
               className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
                 tab === "login"
-                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-foreground hover:text-foreground "
               }`}
             >
               Đăng nhập
@@ -209,8 +211,8 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
               onClick={() => switchTab("register")}
               className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
                 tab === "register"
-                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-foreground hover:text-foreground "
               }`}
             >
               Đăng ký
@@ -218,10 +220,10 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
           </div>
 
           <DialogHeader className="text-left space-y-1">
-            <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white">
+            <DialogTitle className="text-lg font-bold text-foreground ">
               {tab === "login" ? "Đăng nhập" : "Đăng ký tài khoản"}
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
+            <DialogDescription className="text-xs text-muted-foreground ">
               {tab === "login"
                 ? "Nhập email và mật khẩu của bạn để truy cập tài khoản."
                 : "Điền thông tin bên dưới để tạo tài khoản StudyHub mới."}
@@ -236,7 +238,7 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
             type="button"
             variant="outline"
             onClick={handleGoogleLogin}
-            className="w-full h-11 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center gap-3 font-medium text-slate-700 dark:text-slate-200 shadow-sm rounded-xl text-sm transition-colors"
+            className="w-full h-11 border-border bg-card hover:bg-muted flex items-center justify-center gap-3 font-medium text-foreground shadow-sm rounded-xl text-sm transition-colors"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -261,8 +263,8 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
 
           {/* Divider */}
           <div className="relative flex items-center justify-center">
-            <div className="border-t border-slate-200 dark:border-slate-700 w-full"></div>
-            <span className="bg-white dark:bg-slate-900 px-3 text-[11px] font-semibold tracking-wider uppercase text-slate-400 dark:text-slate-500 absolute">
+            <div className="border-t border-border w-full"></div>
+            <span className="bg-card px-3 text-[11px] font-semibold tracking-wider uppercase text-muted-foreground absolute">
               hoặc email
             </span>
           </div>
@@ -276,7 +278,7 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
           )}
 
           {success && (
-            <div className="p-3 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-xl flex items-start gap-2">
+            <div className="p-3 text-xs text-primary bg-primary/10 border border-primary rounded-xl flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{success}</span>
             </div>
@@ -286,7 +288,7 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {tab === "register" && (
               <div className="space-y-1.5 text-left">
-                <Label htmlFor="auth-name" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <Label htmlFor="auth-name" className="text-xs font-semibold text-foreground ">
                   Họ và tên
                 </Label>
                 <Input
@@ -296,13 +298,13 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="h-10 text-sm rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  className="h-10 text-sm rounded-xl border-border bg-card text-foreground "
                 />
               </div>
             )}
 
             <div className="space-y-1.5 text-left">
-              <Label htmlFor="auth-email" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <Label htmlFor="auth-email" className="text-xs font-semibold text-foreground ">
                 Email
               </Label>
               <Input
@@ -312,13 +314,13 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="h-10 text-sm rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                className="h-10 text-sm rounded-xl border-border bg-card text-foreground "
               />
             </div>
 
             <div className="space-y-1.5 text-left">
               <div className="flex items-center justify-between">
-                <Label htmlFor="auth-password" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <Label htmlFor="auth-password" className="text-xs font-semibold text-foreground ">
                   Mật khẩu
                 </Label>
               </div>
@@ -330,12 +332,12 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="h-10 text-sm rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white pr-10"
+                  className="h-10 text-sm rounded-xl border-border bg-card text-foreground pr-10"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -360,7 +362,7 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
           </form>
 
           {/* Footer note */}
-          <div className="text-center pt-2 text-xs text-slate-500 dark:text-slate-400">
+          <div className="text-center pt-2 text-xs text-muted-foreground ">
             {tab === "login" ? (
               <p>
                 Chưa có tài khoản?{" "}

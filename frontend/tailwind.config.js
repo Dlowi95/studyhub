@@ -15,6 +15,9 @@ export default {
     },
     extend: {
       colors: {
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
+        brand: { pink: "hsl(var(--brand-pink))", lavender: "hsl(var(--brand-lavender))", mint: "hsl(var(--brand-mint))", cream: "hsl(var(--brand-cream))" },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

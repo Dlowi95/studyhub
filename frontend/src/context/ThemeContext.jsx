@@ -8,21 +8,31 @@ const ThemeContext = createContext({
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem("studyhub_theme");
+    let saved = null;
+    try {
+      saved = localStorage.getItem("studyhub_theme");
+    } catch {
+      // Private browsing or a disabled storage area should not block rendering.
+    }
     if (saved === "dark" || saved === "light") return saved;
-    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
+    return "light";
   });
 
   useEffect(() => {
     const root = document.documentElement;
+    root.style.colorScheme = theme;
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (themeColor) themeColor.content = theme === "dark" ? "#171c19" : "#f2d9b3";
     if (theme === "dark") {
       root.classList.add("dark");
     } else {
       root.classList.remove("dark");
     }
-    localStorage.setItem("studyhub_theme", theme);
+    try {
+      localStorage.setItem("studyhub_theme", theme);
+    } catch {
+      // The theme still applies for this session when persistence is unavailable.
+    }
   }, [theme]);
 
   const toggleTheme = () => {

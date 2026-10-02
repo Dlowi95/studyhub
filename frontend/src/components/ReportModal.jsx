@@ -77,23 +77,23 @@ export default function ReportModal({ isOpen, onClose, document: doc, onSuccess 
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[440px] p-6 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xl">
+      <DialogContent className="sm:max-w-[440px] p-6 rounded-2xl border-border bg-card text-foreground shadow-xl">
         <DialogHeader className="text-left space-y-1">
-          <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white">
+          <DialogTitle className="text-lg font-bold text-foreground ">
             Báo cáo tài liệu vi phạm
           </DialogTitle>
-          <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">
+          <DialogDescription className="text-xs text-muted-foreground line-clamp-1">
             Tài liệu: {doc?.title || "Không xác định"}
           </DialogDescription>
         </DialogHeader>
 
         {submitted ? (
           <div className="py-6 text-center space-y-2">
-            <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 rounded-full flex items-center justify-center mx-auto">
+            <div className="w-10 h-10 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-6 h-6" />
             </div>
-            <p className="font-semibold text-slate-900 dark:text-white text-sm">Đã gửi báo cáo thành công</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Ban quản trị StudyHub sẽ kiểm duyệt và xử lý trong thời gian sớm nhất.</p>
+            <p className="font-semibold text-foreground text-sm">Đã gửi báo cáo thành công</p>
+            <p className="text-xs text-muted-foreground ">Ban quản trị StudyHub sẽ kiểm duyệt và xử lý trong thời gian sớm nhất.</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
@@ -104,7 +104,7 @@ export default function ReportModal({ isOpen, onClose, document: doc, onSuccess 
               </div>
             )}
             <div className="space-y-2 text-left">
-              <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <Label className="text-xs font-semibold text-foreground ">
                 Lý do báo cáo vi phạm <span className="text-destructive">*</span>
               </Label>
               <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
@@ -115,8 +115,8 @@ export default function ReportModal({ isOpen, onClose, document: doc, onSuccess 
                       key={item.value}
                       className={`flex items-start gap-3 p-2.5 rounded-xl border cursor-pointer text-xs transition-all ${
                         isChecked
-                          ? "border-primary bg-primary/5 dark:bg-primary/10 shadow-xs"
-                          : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                          ? "border-primary bg-primary/5 shadow-xs"
+                          : "border-border hover:bg-muted "
                       }`}
                     >
                       <input
@@ -128,8 +128,8 @@ export default function ReportModal({ isOpen, onClose, document: doc, onSuccess 
                         className="mt-0.5 text-primary focus:ring-primary h-4 w-4"
                       />
                       <div className="space-y-0.5">
-                        <div className="font-semibold text-slate-900 dark:text-slate-100">{item.label}</div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">{item.desc}</div>
+                        <div className="font-semibold text-foreground ">{item.label}</div>
+                        <div className="text-[11px] text-muted-foreground leading-snug">{item.desc}</div>
                       </div>
                     </label>
                   );
@@ -138,7 +138,7 @@ export default function ReportModal({ isOpen, onClose, document: doc, onSuccess 
             </div>
 
             <div className="space-y-1.5 text-left">
-              <Label htmlFor="report-details" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <Label htmlFor="report-details" className="text-xs font-semibold text-foreground ">
                 Mô tả chi tiết (tùy chọn)
               </Label>
               <textarea
@@ -147,12 +147,12 @@ export default function ReportModal({ isOpen, onClose, document: doc, onSuccess 
                 placeholder="Ghi rõ chi tiết lỗi hoặc trang tài liệu có vấn đề..."
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
-                className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full p-2.5 text-xs rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0 pt-2">
-              <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={loading} className="border-slate-200 dark:border-slate-700 dark:text-slate-300">
+              <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={loading} className="border-border ">
                 Hủy
               </Button>
               <Button type="submit" size="sm" disabled={loading} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">

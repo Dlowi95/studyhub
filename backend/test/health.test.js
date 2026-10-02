@@ -16,6 +16,8 @@ test("GET /api/health returns the service status", async () => {
     assert.equal(response.status, 200);
     assert.equal(body.status, "ok");
     assert.ok(["connected", "disconnected"].includes(body.mongo));
+    const adminStats = await fetch(`http://127.0.0.1:${port}/api/admin/stats`);
+    assert.equal(adminStats.status, 401);
   } finally {
     server.close();
     await once(server, "close");

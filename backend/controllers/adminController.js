@@ -1,15 +1,17 @@
 const User = require("../models/user");
 const Document = require("../models/Document");
-const Notification = require("../models/Notification");
-const Review = require("../models/review");
-const Report = require("../models/report");
-const { deleteDocumentPhysicalFile } = require("../utils/fileCleanup");
+const mongoose = require("mongoose");
+const { removeDocument } = require("../utils/removeDocument");
+const { resolveSubject } = require("../utils/resolveSubject");
+const { applyModerationNote } = require("../utils/moderationNote");
 const { checkDocumentSource } = require("../utils/documentStorage");
 const {
   sendDocumentPreviewError,
   sendSafeDocumentPreview,
 } = require("../utils/safeDocumentPreview");
 const { notifyDocumentStatus } = require("../utils/notificationService");
+const AuditLog = require("../models/AuditLog");
+const { recordAuditEvent } = require("../utils/auditLog");
 
 const parseTags = (tagsValue) => {
   if (Array.isArray(tagsValue)) return tagsValue.map((tag) => String(tag).trim()).filter(Boolean);
@@ -98,11 +100,16 @@ exports.createDocument = async (req, res) => {
       status,
     } = req.body;
 
-    if (!title || !subjectName || !fileUrl) {
+    if (typeof title !== "string" || !title.trim() || title.trim().length > 200 || !subjectName || !fileUrl) {
       return res.status(400).json({ message: "Thiếu tiêu đề, học phần hoặc đường dẫn file" });
     }
 
     const nextStatus = ["pending", "approved", "rejected"].includes(status) ? status : "pending";
+    const subject = await resolveSubject(req.body.subjectId, subjectName);
+    if (nextStatus === "approved") {
+      const source = await checkDocumentSource(fileUrl);
+      if (source.available === false) return res.status(409).json({ message: source.issue || "Tệp nguồn không khả dụng" });
+    }
 
     const document = await Document.create({
       title: String(title).trim(),
@@ -110,7 +117,7 @@ exports.createDocument = async (req, res) => {
       fileUrl,
       fileName: fileName || "",
       fileType: fileType || "FILE",
-      subjectName: subjectName || "Khác",
+      ...subject,
       tags: parseTags(tags),
       status: nextStatus,
       uploaderId: req.user?._id || null,
@@ -121,7 +128,7 @@ exports.createDocument = async (req, res) => {
       document,
     });
   } catch (error) {
-    return res.status(500).json({ message: "Server error creating document", error: error.message });
+    return res.status(error.status || 500).json({ message: error.status ? error.message : "Server error creating document", error: error.message });
   }
 };
 
@@ -144,28 +151,42 @@ exports.updateDocument = async (req, res) => {
       status,
     } = req.body;
 
+    const previousStatus = document.status;
+    if (title !== undefined && (typeof title !== "string" || !title.trim() || title.trim().length > 200)) {
+      return res.status(400).json({ message: "Tiêu đề phải từ 1 đến 200 ký tự" });
+    }
     if (title !== undefined) document.title = String(title).trim();
     if (description !== undefined) document.description = description || "";
     if (fileUrl !== undefined) document.fileUrl = fileUrl;
     if (fileName !== undefined) document.fileName = fileName || "";
     if (fileType !== undefined) document.fileType = fileType || "FILE";
-    if (subjectName !== undefined) document.subjectName = subjectName || "Khác";
+    if (subjectName !== undefined || req.body.subjectId !== undefined) {
+      Object.assign(document, await resolveSubject(req.body.subjectId, subjectName));
+    }
     if (tags !== undefined) document.tags = parseTags(tags);
     if (status !== undefined) {
       if (!["pending", "approved", "rejected"].includes(status)) {
         return res.status(400).json({ message: "Status không hợp lệ" });
       }
       document.status = status;
+      applyModerationNote(document, status, req.body.moderationNote);
     }
 
+    if (document.status === "approved" && (previousStatus !== "approved" || fileUrl !== undefined)) {
+      const source = await checkDocumentSource(document.fileUrl);
+      if (source.available === false) return res.status(409).json({ message: source.issue || "Tệp nguồn không khả dụng" });
+    }
     await document.save();
+    if (previousStatus !== document.status) await notifyDocumentStatus(document, document.status).catch((error) => {
+      console.error("Không thể tạo thông báo trạng thái tài liệu:", error.message);
+    });
 
     return res.json({
       message: "Cập nhật tài liệu thành công",
       document,
     });
   } catch (error) {
-    return res.status(500).json({ message: "Server error updating document", error: error.message });
+    return res.status(error.status || 500).json({ message: error.status ? error.message : "Server error updating document", error: error.message });
   }
 };
 
@@ -177,15 +198,7 @@ exports.deleteDocument = async (req, res) => {
       return res.status(404).json({ message: "Tài liệu không tồn tại" });
     }
 
-    // Xoá file vật lý & xoá cascade reviews, reports
-    await Promise.allSettled([
-      deleteDocumentPhysicalFile(document),
-      Review.deleteMany({ documentId: req.params.id }),
-      Report.deleteMany({ documentId: req.params.id }),
-      Notification.deleteMany({ relatedDocumentId: req.params.id }),
-    ]);
-
-    await Document.findByIdAndDelete(req.params.id);
+    await removeDocument(document);
 
     return res.json({
       message: "Xoá tài liệu thành công",
@@ -221,8 +234,22 @@ exports.updateDocumentStatus = async (req, res) => {
     }
 
     const previousStatus = document.status;
+    applyModerationNote(document, status, req.body.moderationNote);
     document.status = status;
     await document.save();
+    if (previousStatus !== status) {
+      await recordAuditEvent({
+        actor: req.user,
+        action: "document_status_changed",
+        entityType: "Document",
+        entityId: document._id,
+        documentId: document._id,
+        previousStatus,
+        nextStatus: status,
+        reason: document.moderationNote,
+        metadata: { title: document.title },
+      });
+    }
     if (previousStatus !== status) {
       await notifyDocumentStatus(document, status).catch((notificationError) => {
         console.error("Không thể tạo thông báo trạng thái tài liệu:", notificationError.message);
@@ -235,7 +262,33 @@ exports.updateDocumentStatus = async (req, res) => {
       document,
     });
   } catch (error) {
-    return res.status(500).json({ message: "Server error updating document status", error: error.message });
+    return res.status(error.status || 500).json({ message: error.status ? error.message : "Server error updating document status", error: error.message });
+  }
+};
+
+exports.getAuditLogs = async (req, res) => {
+  try {
+    const page = Math.min(10000, Math.max(1, parseInt(req.query.page, 10) || 1));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 30));
+    const query = {};
+    if (typeof req.query.action === "string" && req.query.action.trim()) query.action = req.query.action.trim();
+    if (typeof req.query.entityType === "string" && req.query.entityType.trim()) query.entityType = req.query.entityType.trim();
+    if (typeof req.query.documentId === "string" && req.query.documentId.trim()) {
+      if (!mongoose.isObjectIdOrHexString(req.query.documentId)) return res.status(400).json({ message: "Mã tài liệu không hợp lệ" });
+      query.documentId = req.query.documentId.trim();
+    }
+    const [items, total] = await Promise.all([
+      AuditLog.find(query)
+        .sort({ createdAt: -1, _id: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate("actorId", "name email role")
+        .lean(),
+      AuditLog.countDocuments(query),
+    ]);
+    return res.json({ items, page, limit, total, totalPages: Math.ceil(total / limit) });
+  } catch (error) {
+    return res.status(500).json({ message: "Lỗi lấy nhật ký kiểm duyệt", error: error.message });
   }
 };
 

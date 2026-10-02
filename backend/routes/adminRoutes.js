@@ -2,10 +2,13 @@ const express = require("express");
 const router = express.Router();
 const adminController = require("../controllers/adminController");
 const subjectController = require("../controllers/subjectController");
+const documentController = require("../controllers/documentController");
 const { authenticateToken, authorizeRoles } = require("../middleware/auth");
 
 // All admin/moderator routes require authentication
 router.use(authenticateToken);
+router.get("/stats", authorizeRoles("admin", "moderator"), documentController.getDocumentStats);
+router.get("/audit-logs", authorizeRoles("admin", "moderator"), adminController.getAuditLogs);
 
 // Document moderation endpoints (accessible by both Admin and Moderator)
 router.get("/documents", authorizeRoles("admin", "moderator"), adminController.getAllDocuments);

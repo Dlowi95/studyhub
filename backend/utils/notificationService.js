@@ -60,7 +60,7 @@ const notifyDocumentStatus = async (document, status) => {
     title: approved ? "Tài liệu đã được phê duyệt" : "Tài liệu chưa được phê duyệt",
     message: approved
       ? `Tài liệu “${document.title}” đã được công khai trên StudyHub.`
-      : `Tài liệu “${document.title}” đã bị từ chối. Bạn có thể kiểm tra và tải lại bản phù hợp.`,
+      : `Tài liệu “${document.title}” đã bị từ chối.${document.moderationNote ? ` Lý do: ${document.moderationNote}.` : ""} Bạn có thể kiểm tra và tải lại bản phù hợp.`,
     link: approved ? `/documents/${document._id}` : "/profile",
     relatedDocumentId: document._id,
     createdAt: document.updatedAt || new Date(),
@@ -85,7 +85,7 @@ const notifyReportStatus = async (report) => {
   const status = report?.status;
   if (!report?._id || !report?.reporterId || !["resolved", "dismissed"].includes(status)) return;
   const resolved = status === "resolved";
-  const documentTitle = report.documentId?.title || "Tài liệu";
+  const documentTitle = report.documentId?.title || report.documentTitle || "Tài liệu";
   const feedback = report.adminFeedback
     ? ` Ghi chú từ quản trị viên: “${report.adminFeedback}”.`
     : "";
@@ -157,7 +157,7 @@ const syncHistoricalNotificationsForUser = async (user) => {
         eventKey: `report:${report._id}:submitted`,
         type: "report_submitted",
         title: "Có báo cáo vi phạm đang chờ xử lý",
-        message: `Tài liệu “${report.documentId?.title || "Không rõ tiêu đề"}” có báo cáo cần xem xét.`,
+        message: `Tài liệu “${report.documentId?.title || report.documentTitle || "Không rõ tiêu đề"}” có báo cáo cần xem xét.`,
         link: "/admin?tab=reports",
         relatedDocumentId: report.documentId?._id || report.documentId,
         relatedReportId: report._id,

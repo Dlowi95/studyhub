@@ -1,3 +1,4 @@
+import { clearAccountSession } from "@/lib/session";
 import { Navigate } from "react-router-dom";
 
 export default function ProtectedRoute({ children, allowedRoles }) {
@@ -13,13 +14,13 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   try {
     user = JSON.parse(userString);
   } catch {
-    localStorage.clear();
+    clearAccountSession();
     window.dispatchEvent(new CustomEvent("openAuthModal", { detail: { tab: "login" } }));
     return <Navigate to="/" replace />;
   }
 
   if (user.status === "blocked") {
-    localStorage.clear();
+    clearAccountSession();
     window.dispatchEvent(new CustomEvent("openAuthModal", { detail: { tab: "login" } }));
     return <Navigate to="/" replace />;
   }

@@ -1,190 +1,58 @@
+@import './design-system.css';
+@import './search.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 174 84% 34%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 174 20% 96%;
-    --secondary-foreground: 174 84% 20%;
-
-    --muted: 210 20% 96%;
-    --muted-foreground: 215 16% 47%;
-
-    --accent: 174 25% 95%;
-    --accent-foreground: 174 84% 20%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 214 30% 91%;
-    --input: 214 30% 91%;
-    --ring: 174 84% 34%;
-
-    --radius: 0.75rem;
+    --background: 36 71% 83%; --foreground: 107 30% 30%;
+    --card: 42 100% 99%; --card-foreground: 107 30% 30%;
+    --popover: 42 100% 99%; --popover-foreground: 107 30% 30%;
+    --primary: 107 30% 35%; --primary-foreground: 42 100% 97%;
+    --secondary: 175 49% 80%; --secondary-foreground: 107 30% 28%;
+    --muted: 39 53% 92%; --muted-foreground: 107 16% 33%;
+    --accent: 240 55% 87%; --accent-foreground: 107 30% 28%;
+    --destructive: 0 64% 43%; --destructive-foreground: 0 0% 100%;
+    --border: 107 30% 35%; --input: 107 20% 69%; --ring: 107 30% 35%;
+    --success: 107 30% 35%; --warning: 33 77% 31%;
+    --brand-pink: 330 63% 75%; --brand-lavender: 239 57% 85%;
+    --brand-mint: 176 49% 80%; --brand-cream: 36 71% 83%;
+    --radius: 1rem; --paper-shadow: 5px 5px 0 #4b763f;
+    --pastel-pink: #e899c1; --pastel-lavender: #c5c6ef; --pastel-mint: #b4e5e2;
+    --pastel-cream: #f2d9b3; --pastel-soft-cream: #f7e8d1;
+    --illustration-ink: #344e2c; --illustration-border: #4b763f;
+    --illustration-paper: #fffefa; --illustration-shadow: #4b763f;
+    --cover-grid: #4b763f35; --stats-surface: #4b763f; --pink-ink: #bc4d88;
   }
-
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 160 84% 39%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 160 84% 39%;
+    --background: 145 10% 10%; --foreground: 42 22% 91%;
+    --card: 145 10% 15%; --card-foreground: 42 22% 91%;
+    --popover: 145 10% 17%; --popover-foreground: 42 22% 91%;
+    --primary: 104 27% 70%; --primary-foreground: 145 17% 12%;
+    --secondary: 167 22% 25%; --secondary-foreground: 169 39% 82%;
+    --muted: 145 9% 20%; --muted-foreground: 120 8% 72%;
+    --accent: 243 14% 26%; --accent-foreground: 239 35% 90%;
+    --destructive: 0 76% 72%; --destructive-foreground: 0 25% 15%;
+    --border: 116 12% 39%; --input: 116 10% 38%; --ring: 104 27% 70%;
+    --success: 104 27% 70%; --warning: 35 70% 70%; --paper-shadow: 5px 5px 0 #0c120e;
+    --brand-pink: 326 16% 25%; --brand-lavender: 243 14% 26%;
+    --brand-mint: 157 20% 21%; --brand-cream: 35 16% 23%;
+    --pastel-pink: #49363f; --pastel-lavender: #363542; --pastel-mint: #2b4138;
+    --pastel-cream: #403a30; --pastel-soft-cream: #35332c;
+    --illustration-ink: #ece9df; --illustration-border: #8ea486;
+    --illustration-paper: #26302a; --illustration-shadow: #0c120e;
+    --cover-grid: #bacab62a; --stats-surface: #2c3a2b; --pink-ink: #dfaec6;
   }
+  * { @apply border-border; }
+  html { scroll-behavior: smooth; scroll-padding-top: 120px; }
+  body { @apply bg-background text-foreground antialiased; font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif; min-width: 320px; }
+  button, a, input, select, textarea { @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background; }
+  button:disabled { cursor: not-allowed; }
 }
-
-.studyhub-docx-preview .studyhub-docx-wrapper {
-  min-height: 100%;
-  padding: 1rem;
-  background: rgb(241 245 249);
-}
-
-.dark .studyhub-docx-preview .studyhub-docx-wrapper {
-  background: rgb(2 6 23);
-}
-
-.studyhub-docx-preview .studyhub-docx-wrapper > section.studyhub-docx {
-  margin: 0 auto 1rem;
-  box-shadow: 0 4px 18px rgb(15 23 42 / 12%);
-}
-
-@media (max-width: 640px) {
-  .studyhub-docx-preview .studyhub-docx-wrapper {
-    padding: 0.5rem;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-  html {
-    scroll-behavior: smooth;
-  }
-  body {
-    @apply bg-background text-foreground antialiased;
-    font-feature-settings: "rlig" 1, "calt" 1;
-    font-family: Inter, "Be Vietnam Pro", "Segoe UI", system-ui, -apple-system, sans-serif;
-    min-width: 320px;
-  }
-  button,
-  a,
-  input,
-  select,
-  textarea {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950;
-  }
-}
-
-@layer utilities {
-  .scrollbar-none {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .scrollbar-none::-webkit-scrollbar {
-    display: none;
-  }
-}
-
-::selection {
-  background: rgba(16, 185, 129, 0.24);
-  color: inherit;
-}
-
-.studyhub-page {
-  background-image:
-    radial-gradient(circle at 12% 8%, rgba(16, 185, 129, 0.06), transparent 26rem),
-    radial-gradient(circle at 90% 30%, rgba(14, 165, 233, 0.04), transparent 24rem);
-}
-
-.dark .studyhub-page {
-  background-image:
-    radial-gradient(circle at 12% 8%, rgba(16, 185, 129, 0.08), transparent 28rem),
-    radial-gradient(circle at 90% 30%, rgba(14, 165, 233, 0.06), transparent 25rem);
-}
-
-.hero-grid,
-.document-cover-grid {
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.075) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.075) 1px, transparent 1px);
-  background-size: 34px 34px;
-  mask-image: linear-gradient(to bottom, black, transparent 88%);
-}
-
-.document-cover-grid {
-  background-size: 22px 22px;
-}
-
-.studyhub-hero::after,
-.studyhub-cta::after {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(125deg, rgba(255, 255, 255, 0.08), transparent 28%, transparent 72%, rgba(16, 185, 129, 0.08));
-  content: "";
-  pointer-events: none;
-}
-
-.hero-float {
-  animation: hero-float 6s ease-in-out infinite;
-}
-
-@keyframes hero-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-7px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
-  }
-}
+.studyhub-docx-preview .studyhub-docx-wrapper { min-height: 100%; padding: 1rem; background: hsl(var(--muted)); }
+.studyhub-docx-preview .studyhub-docx-wrapper > section.studyhub-docx { margin: 0 auto 1rem; box-shadow: 0 4px 18px #15241c20; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+::selection { background: #e899c1; color: #344e2c; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }

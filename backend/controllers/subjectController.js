@@ -22,9 +22,9 @@ const defaultSubjectNames = [
 
 const buildSubjectList = async ({ includeInactive = false } = {}) => {
   const [savedSubjects, documentUsage] = await Promise.all([
-    Subject.find(includeInactive ? {} : { active: true }).sort({ name: 1 }).lean(),
+    Subject.find({}).sort({ name: 1 }).lean(),
     Document.aggregate([
-      { $match: { subjectName: { $type: "string", $ne: "" } } },
+      { $match: { subjectName: { $type: "string", $ne: "" }, ...(!includeInactive ? { status: "approved" } : {}) } },
       {
         $group: {
           _id: "$subjectName",
@@ -47,10 +47,11 @@ const buildSubjectList = async ({ includeInactive = false } = {}) => {
     usageByName.set(key, current);
   });
 
-  const result = savedSubjects.map((subject) => {
+  const result = savedSubjects.flatMap((subject) => {
     const usage = usageByName.get(subject.nameKey) || { count: 0, views: 0, downloads: 0 };
     usageByName.delete(subject.nameKey);
-    return {
+    if (!includeInactive && subject.active === false) return [];
+    return [{
       id: subject._id,
       _id: subject._id,
       name: subject.name,
@@ -59,7 +60,7 @@ const buildSubjectList = async ({ includeInactive = false } = {}) => {
       count: usage.count,
       views: usage.views,
       downloads: usage.downloads,
-    };
+    }];
   });
 
   const savedNameKeys = new Set(savedSubjects.map((subject) => subject.nameKey));
@@ -111,8 +112,8 @@ exports.createSubject = async (req, res) => {
     const nameKey = getSubjectNameKey(name);
     const code = cleanSubjectCode(req.body?.code);
 
-    if (name.length < 2) {
-      return res.status(400).json({ message: "Tên học phần phải có ít nhất 2 ký tự" });
+    if (name.length < 2 || name.length > 120) {
+      return res.status(400).json({ message: "Tên học phần phải từ 2 đến 120 ký tự" });
     }
 
     if (code && !/^[A-Z0-9][A-Z0-9._-]{0,19}$/.test(code)) {

@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import StarRating from "./StarRating";
 import { Loader2, Trash2 } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString("vi-VN", {
@@ -31,7 +31,8 @@ export default function ReviewList({ documentId, refreshKey, onAvgRatingChange }
   const { toast } = useToast();
 
   const token = localStorage.getItem("token");
-  const currentUser = JSON.parse(localStorage.getItem("user") || "null");
+  let currentUser = null;
+  try { currentUser = JSON.parse(localStorage.getItem("user") || "null"); } catch { /* Ignore an expired local session. */ }
 
   const fetchReviews = useCallback(async () => {
     setLoading(true);
@@ -101,7 +102,7 @@ export default function ReviewList({ documentId, refreshKey, onAvgRatingChange }
   return (
     <ul className="space-y-4">
       {reviews.map((review) => {
-        const isOwner = currentUser && review.userId?._id === currentUser.id;
+        const isOwner = currentUser && review.userId?._id === (currentUser.id || currentUser._id);
         const isAdmin = currentUser?.role === "admin";
         const canDelete = isOwner || isAdmin;
 

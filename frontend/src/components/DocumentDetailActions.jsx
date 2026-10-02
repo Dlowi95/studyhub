@@ -16,60 +16,63 @@ export default function DocumentDetailActions({
 }) {
   const { toast } = useToast();
   const [isBookmarked, setIsBookmarked] = useState(false);
+  const [bookmarkBusy, setBookmarkBusy] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
   useEffect(() => {
     if (!doc?.id) return;
-    try {
-      const saved = JSON.parse(localStorage.getItem("studyhub_bookmarks") || "[]");
-      queueMicrotask(() =>
-        setIsBookmarked(saved.some((item) => item.id === doc.id || item._id === doc.id))
-      );
-    } catch {
-      queueMicrotask(() => setIsBookmarked(false));
-    }
-  }, [doc?.id]);
-
-  const handleToggleBookmark = () => {
-    if (!doc) return;
-    try {
-      const saved = JSON.parse(localStorage.getItem("studyhub_bookmarks") || "[]");
-      const exists = saved.some((item) => item.id === doc.id || item._id === doc.id);
-
-      let updated = [];
-      if (exists) {
-        updated = saved.filter((item) => item.id !== doc.id && item._id !== doc.id);
-        setIsBookmarked(false);
-        toast({
-          title: "Đã bỏ lưu tài liệu",
-          description: "Tài liệu đã được xóa khỏi danh sách đã lưu của bạn.",
-        });
-      } else {
-        updated = [
-          ...saved,
-          {
-            id: doc.id,
-            title: doc.title,
-            subject: doc.subjectName || doc.subject,
-            uploader: doc.uploader || doc.uploaderId?.name || "StudyHub",
-            size: doc.size,
-            fileUrl: doc.fileUrl,
-            savedAt: new Date().toISOString(),
-          },
-        ];
-        setIsBookmarked(true);
-        toast({
-          title: "Đã lưu tài liệu",
-          description: "Bạn có thể xem lại tài liệu này trong trang Hồ sơ cá nhân.",
-        });
+    let active = true;
+    const syncBookmark = () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        queueMicrotask(() => { if (active) setIsBookmarked(false); });
+        return;
       }
-      localStorage.setItem("studyhub_bookmarks", JSON.stringify(updated));
-    } catch {
+      fetch(`${apiUrl}/bookmarks/${doc.id}`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(async (response) => {
+          if (!response.ok) throw new Error("Không thể kiểm tra tài liệu đã lưu");
+          return response.json();
+        })
+        .then((data) => { if (active) setIsBookmarked(Boolean(data.bookmarked)); })
+        .catch(() => { if (active) setIsBookmarked(false); });
+    };
+    syncBookmark();
+    window.addEventListener("authChange", syncBookmark);
+    return () => { active = false; window.removeEventListener("authChange", syncBookmark); };
+  }, [apiUrl, doc?.id]);
+
+  const handleToggleBookmark = async () => {
+    if (!doc) return;
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast({ title: "Đăng nhập để lưu tài liệu", description: "Tài liệu đã lưu sẽ đồng bộ trên mọi thiết bị." });
+      window.dispatchEvent(new CustomEvent("openAuthModal", { detail: { tab: "login" } }));
+      return;
+    }
+    if (bookmarkBusy) return;
+    setBookmarkBusy(true);
+    try {
+      const response = await fetch(`${apiUrl}/bookmarks/${doc.id}`, {
+        method: isBookmarked ? "DELETE" : "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Không thể cập nhật tài liệu đã lưu");
+      setIsBookmarked(Boolean(data.bookmarked));
+      window.dispatchEvent(new Event("bookmarksChanged"));
+      toast({
+        title: data.bookmarked ? "Đã lưu tài liệu" : "Đã bỏ lưu tài liệu",
+        description: data.bookmarked ? "Danh sách đã lưu được đồng bộ theo tài khoản của bạn." : "Tài liệu đã được xóa khỏi danh sách đã lưu.",
+      });
+    } catch (error) {
       toast({
         variant: "destructive",
-        title: "Lỗi",
-        description: "Không thể lưu tài liệu vào trình duyệt.",
+        title: "Không thể cập nhật tài liệu đã lưu",
+        description: error.message,
       });
+    } finally {
+      setBookmarkBusy(false);
     }
   };
 
@@ -104,10 +107,10 @@ export default function DocumentDetailActions({
           type="button"
           disabled={fileUnavailable || isDownloading}
           onClick={() => onDownload?.(doc)}
-          className="group h-12 w-full justify-between rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 px-4 text-white shadow-[0_12px_28px_-14px_rgba(5,150,105,0.85)] transition-all hover:from-emerald-500 hover:to-teal-500 hover:shadow-[0_16px_32px_-14px_rgba(5,150,105,0.95)] active:scale-[0.99] disabled:bg-none disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
+          className="group h-12 w-full justify-between rounded-full bg-primary px-4 text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.99] disabled:bg-muted disabled:text-muted-foreground"
         >
           <span className="flex min-w-0 items-center gap-2.5 text-sm font-bold">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/15 transition-colors group-hover:bg-white/20">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-card text-foreground transition-colors group-hover:bg-card">
               {isDownloading ? (
                 <LoaderCircle className="h-4 w-4 animate-spin" />
               ) : (
@@ -124,11 +127,11 @@ export default function DocumentDetailActions({
           </span>
           {!fileUnavailable && (
             <span
-              className="ml-3 inline-flex shrink-0 items-baseline gap-1 rounded-full bg-white px-2.5 py-1 text-red-600 shadow-sm ring-1 ring-black/5"
+              className="ml-3 inline-flex shrink-0 items-baseline gap-1 rounded-full bg-card px-2.5 py-1 text-destructive shadow-sm ring-1 ring-black/5"
               aria-label={`${downloadCount} lượt tải`}
             >
               <span className="text-sm font-black leading-none">{downloadCount}</span>
-              <span className="text-[9px] font-bold uppercase tracking-wide text-red-500">lượt</span>
+              <span className="text-[9px] font-bold uppercase tracking-wide text-destructive">lượt</span>
             </span>
           )}
         </Button>
@@ -144,9 +147,9 @@ export default function DocumentDetailActions({
                 window.open(normalizeFileUrl(doc.fileUrl), "_blank", "noopener,noreferrer");
               }
             }}
-            className="h-11 w-full justify-start gap-2.5 rounded-2xl border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-xs transition-colors hover:border-emerald-300 hover:bg-emerald-50/60 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-300"
+            className="h-11 w-full justify-start gap-2.5 rounded-2xl border-border bg-card px-4 text-sm font-semibold text-foreground shadow-xs transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary "
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground ">
               <FileText className="h-4 w-4" />
             </span>
             <span>Mở xem trực tiếp</span>
@@ -155,26 +158,27 @@ export default function DocumentDetailActions({
       </div>
 
       {fileUnavailable && (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+        <p className="rounded-xl border border-warning bg-warning/10 px-3 py-2 text-[11px] leading-5 text-warning ">
           {fileIssue || "Tệp nguồn không còn trên máy chủ. Người đăng cần tải lại tài liệu."}
         </p>
       )}
 
       {/* Utility actions */}
-      <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+      <div className="grid grid-cols-2 gap-2 border-t border-border pt-4 ">
         {/* Bookmark Button */}
         <Button
           type="button"
           variant="outline"
+          disabled={bookmarkBusy}
           size="sm"
           onClick={handleToggleBookmark}
-          className={`h-10 w-full rounded-xl border-slate-200 text-xs font-semibold gap-1.5 transition-colors dark:border-slate-700 ${
+          className={`h-10 w-full rounded-xl border-border text-xs font-semibold gap-1.5 transition-colors  ${
             isBookmarked
-              ? "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50"
-              : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+              ? "bg-warning/10 text-warning border-warning hover:bg-warning/10 "
+              : "text-foreground hover:bg-muted "
           }`}
         >
-          <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? "fill-amber-500 text-amber-500" : ""}`} />
+          <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? "fill-warning text-warning" : ""}`} />
           <span>{isBookmarked ? "Đã lưu" : "Lưu tài liệu"}</span>
         </Button>
 
@@ -184,12 +188,12 @@ export default function DocumentDetailActions({
           variant="outline"
           size="sm"
           onClick={handleShare}
-          className="h-10 w-full rounded-xl border-slate-200 text-xs font-semibold text-slate-600 gap-1.5 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          className="h-10 w-full rounded-xl border-border text-xs font-semibold text-foreground gap-1.5 hover:bg-muted "
         >
           {isCopied ? (
             <>
-              <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span className="text-emerald-700 dark:text-emerald-400">Đã sao chép</span>
+              <Check className="w-3.5 h-3.5 text-primary " />
+              <span className="text-primary ">Đã sao chép</span>
             </>
           ) : (
             <>
@@ -217,9 +221,9 @@ export default function DocumentDetailActions({
                     : "Bạn đã gửi báo cáo vi phạm cho tài liệu này và đang chờ ban quản trị xem xét.",
               });
             }}
-            className="h-9 w-full rounded-xl border-amber-300 bg-amber-50 text-xs font-semibold text-amber-700 gap-1.5 shadow-2xs cursor-pointer dark:border-amber-700/80 dark:bg-amber-950/40 dark:text-amber-400"
+            className="h-9 w-full rounded-xl border-warning bg-warning/10 text-xs font-semibold text-warning gap-1.5 shadow-2xs cursor-pointer "
           >
-            <MessageSquareWarning className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            <MessageSquareWarning className="w-3.5 h-3.5 text-warning " />
             <span>Đã báo cáo vi phạm</span>
           </Button>
         ) : (
@@ -228,7 +232,7 @@ export default function DocumentDetailActions({
             variant="outline"
             size="sm"
             onClick={() => onReport?.(doc)}
-            className="h-9 w-full rounded-xl border-slate-200 bg-white text-xs font-semibold text-slate-500 gap-1.5 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-300 dark:hover:border-red-900/60 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+            className="h-9 w-full rounded-xl border-border bg-card text-xs font-semibold text-muted-foreground gap-1.5 transition-colors hover:border-destructive hover:bg-destructive/10 hover:text-destructive "
           >
             <MessageSquareWarning className="w-3.5 h-3.5" />
             <span>Báo cáo vi phạm</span>

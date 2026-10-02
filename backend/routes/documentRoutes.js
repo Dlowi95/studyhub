@@ -12,6 +12,7 @@ const {
   incrementView,
   incrementDownload,
   previewDocument,
+  getSearchSuggestions,
 } = require("../controllers/documentController");
 const { authenticateToken, authorizeRoles } = require("../middleware/auth");
 
@@ -33,6 +34,7 @@ router.post(
 
 router.get("/stats", getDocumentStats);
 router.get("/my", authenticateToken, getMyDocuments);
+router.get("/suggestions", getSearchSuggestions);
 router.get("/", getDocuments);
 router.get("/:id/preview", previewDocument);
 router.get("/:id", getDocumentById);

@@ -34,7 +34,7 @@ export default function StarRating({
             <Star
               size={size}
               className={cn(
-                filled ? "fill-amber-400 text-amber-400" : "fill-none text-muted-foreground"
+                filled ? "fill-warning text-warning" : "fill-none text-muted-foreground"
               )}
             />
           </button>

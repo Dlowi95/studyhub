@@ -28,8 +28,12 @@ exports.createReview = async (req, res) => {
     const { rating, comment } = req.body;
     const userId = req.user._id;
 
-    if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({ message: 'Rating phải từ 1 đến 5' });
+    if (!mongoose.isObjectIdOrHexString(documentId)) return res.status(400).json({ message: 'Mã tài liệu không hợp lệ' });
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: 'Điểm đánh giá phải là số nguyên từ 1 đến 5' });
+    }
+    if (comment !== undefined && (typeof comment !== 'string' || comment.trim().length > 1000)) {
+      return res.status(400).json({ message: 'Nhận xét tối đa 1.000 ký tự' });
     }
 
     const document = await Document.findById(documentId);
@@ -44,7 +48,7 @@ exports.createReview = async (req, res) => {
       documentId,
       userId,
       rating,
-      comment: comment || '',
+      comment: comment?.trim() || '',
     });
 
     const avgRating = await recalculateAvgRating(documentId);
@@ -65,6 +69,7 @@ exports.createReview = async (req, res) => {
 exports.getReviewsByDocument = async (req, res) => {
   try {
     const { documentId } = req.params;
+    if (!mongoose.isObjectIdOrHexString(documentId)) return res.status(400).json({ message: 'Mã tài liệu không hợp lệ' });
 
     const document = await Document.findById(documentId);
     if (!document) {
@@ -89,6 +94,7 @@ exports.getReviewsByDocument = async (req, res) => {
 exports.deleteReview = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!mongoose.isObjectIdOrHexString(id)) return res.status(400).json({ message: 'Mã đánh giá không hợp lệ' });
     const review = await Review.findById(id);
 
     if (!review) {

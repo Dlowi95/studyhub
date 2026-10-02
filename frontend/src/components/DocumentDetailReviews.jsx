@@ -14,21 +14,18 @@ import { Star } from "lucide-react";
 export default function DocumentDetailReviews({ documentId, avgRating, onAvgRatingChange }) {
   // Mỗi lần tăng refreshKey, ReviewList sẽ tự fetch lại danh sách
   const [refreshKey, setRefreshKey] = useState(0);
-  const [localAvg, setLocalAvg] = useState(avgRating ?? 0);
 
   const handleReviewSuccess = (_review, newAvg) => {
     // Làm mới danh sách
     setRefreshKey((k) => k + 1);
     // Cập nhật avgRating hiển thị local
     if (newAvg !== undefined) {
-      setLocalAvg(newAvg);
       onAvgRatingChange?.(newAvg);
     }
   };
 
   const handleAvgRatingChange = (newAvg) => {
     if (newAvg !== undefined) {
-      setLocalAvg(newAvg);
       onAvgRatingChange?.(newAvg);
     }
   };
@@ -36,21 +33,21 @@ export default function DocumentDetailReviews({ documentId, avgRating, onAvgRati
   if (!documentId) return null;
 
   return (
-    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-5">
+    <div className="rounded-2xl border border-border bg-card p-5 space-y-5">
       {/* Tiêu đề khu vực đánh giá */}
-      <div className="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
-        <h3 className="text-base font-bold text-slate-900 dark:text-white">Đánh giá tài liệu</h3>
-        {localAvg > 0 && (
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 px-3 py-1 text-sm font-semibold text-amber-700 dark:text-amber-400">
-            <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-            {localAvg.toFixed(1)}
+      <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
+        <h3 className="text-base font-bold text-foreground ">Đánh giá tài liệu</h3>
+        {avgRating > 0 && (
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-warning/10 border border-warning px-3 py-1 text-sm font-semibold text-warning ">
+            <Star className="h-4 w-4 fill-warning text-warning" />
+            {avgRating.toFixed(1)}
           </span>
         )}
       </div>
 
       {/* Form gửi đánh giá mới */}
       <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground ">
           Gửi đánh giá của bạn
         </p>
         <ReviewForm documentId={documentId} onSuccess={handleReviewSuccess} />
@@ -58,7 +55,7 @@ export default function DocumentDetailReviews({ documentId, avgRating, onAvgRati
 
       {/* Danh sách đánh giá */}
       <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground ">
           Đánh giá từ cộng đồng
         </p>
         <ReviewList

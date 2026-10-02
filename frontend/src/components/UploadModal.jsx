@@ -5,18 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UploadCloud, CheckCircle2, AlertCircle, Loader2, ShieldCheck, ArrowRight, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { fallbackSubjects, validateUploadFile } from "@/lib/documentUpload";
 
-const defaultSubjectOptions = [
-  "Giải tích",
-  "Đại số tuyến tính",
-  "Triết học Mác-Lênin",
-  "Cấu trúc dữ liệu & Giải thuật",
-  "Lập trình C/C++",
-  "Vật lý đại cương",
-  "Kinh tế vĩ mô",
-  "Mạng máy tính",
-  "Khác",
-];
+const defaultSubjectOptions = fallbackSubjects;
 
 export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
   const { toast } = useToast();
@@ -44,7 +35,7 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
         const savedNames = Array.isArray(data.subjects)
           ? data.subjects.map((item) => item.name).filter(Boolean)
           : [];
-        setSubjectOptions([...new Set([...savedNames, ...defaultSubjectOptions])]);
+        setSubjectOptions([...new Set(savedNames)]);
       })
       .catch(() => {
         if (!cancelled) setSubjectOptions(defaultSubjectOptions);
@@ -55,15 +46,15 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
     };
   }, [isOpen]);
 
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files?.[0];
+  const handleFileSelect = (selectedFile) => {
     if (selectedFile) {
-      if (selectedFile.size > 25 * 1024 * 1024) {
-        setError("Dung lượng file tối đa là 25MB.");
+      const validationError = validateUploadFile(selectedFile);
+      if (validationError) {
+        setError(validationError);
         toast({
           variant: "destructive",
-          title: "File quá dung lượng",
-          description: "Dung lượng tệp tải lên tối đa là 25MB. Vui lòng chọn tệp nhỏ hơn.",
+          title: "Tệp không hợp lệ",
+          description: validationError,
         });
         return;
       }
@@ -105,7 +96,7 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
 
     try {
       const formData = new FormData();
-      formData.append("title", title);
+      formData.append("title", title.trim());
       formData.append("description", description || `${docType} - ${subject}`);
       formData.append("subjectName", subject);
       formData.append("tags", subject);
@@ -168,31 +159,31 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleCloseModal()}>
-      <DialogContent className="sm:max-w-[500px] p-6 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xl">
+      <DialogContent className="sm:max-w-[500px] p-6 rounded-2xl border-border bg-card text-foreground shadow-xl">
         <DialogHeader className="text-left space-y-1">
-          <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white">
+          <DialogTitle className="text-lg font-bold text-foreground ">
             Đăng tải tài liệu học tập
           </DialogTitle>
-          <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
+          <DialogDescription className="text-xs text-muted-foreground ">
             Chia sẻ đề thi, giáo trình và tài liệu ôn tập cùng sinh viên StudyHub.
           </DialogDescription>
         </DialogHeader>
 
         {/* Step Indicator Header */}
         {!success && (
-          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 pt-1 text-xs">
-            <div className={`flex items-center gap-1.5 font-semibold ${step >= 1 ? "text-primary" : "text-slate-400 dark:text-slate-500"}`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 1 ? "bg-primary text-white" : "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400"}`}>1</span>
+          <div className="flex items-center justify-between border-b border-border pb-3 pt-1 text-xs">
+            <div className={`flex items-center gap-1.5 font-semibold ${step >= 1 ? "text-primary" : "text-muted-foreground "}`}>
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 1 ? "bg-primary text-primary-foreground" : "bg-card text-foreground "}`}>1</span>
               <span>Chọn file</span>
             </div>
-            <div className="h-0.5 w-6 bg-slate-200 dark:bg-slate-800"></div>
-            <div className={`flex items-center gap-1.5 font-semibold ${step >= 2 ? "text-primary" : "text-slate-400 dark:text-slate-500"}`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 2 ? "bg-primary text-white" : "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400"}`}>2</span>
+            <div className="h-0.5 w-6 bg-card "></div>
+            <div className={`flex items-center gap-1.5 font-semibold ${step >= 2 ? "text-primary" : "text-muted-foreground "}`}>
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 2 ? "bg-primary text-primary-foreground" : "bg-card text-foreground "}`}>2</span>
               <span>Thông tin</span>
             </div>
-            <div className="h-0.5 w-6 bg-slate-200 dark:bg-slate-800"></div>
-            <div className={`flex items-center gap-1.5 font-semibold ${step >= 3 ? "text-primary" : "text-slate-400 dark:text-slate-500"}`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 3 ? "bg-primary text-white" : "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400"}`}>3</span>
+            <div className="h-0.5 w-6 bg-card "></div>
+            <div className={`flex items-center gap-1.5 font-semibold ${step >= 3 ? "text-primary" : "text-muted-foreground "}`}>
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 3 ? "bg-primary text-primary-foreground" : "bg-card text-foreground "}`}>3</span>
               <span>Gửi duyệt</span>
             </div>
           </div>
@@ -209,11 +200,11 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
         {/* Success Screen */}
         {success ? (
           <div className="py-8 text-center space-y-3">
-            <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 rounded-full flex items-center justify-center mx-auto">
+            <div className="w-12 h-12 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-7 h-7" />
             </div>
-            <h4 className="font-bold text-slate-900 dark:text-white text-base">Gửi tài liệu thành công</h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
+            <h4 className="font-bold text-foreground text-base">Gửi tài liệu thành công</h4>
+            <p className="text-xs text-muted-foreground max-w-xs mx-auto">
               Tài liệu đã được đưa vào hàng đợi kiểm duyệt. Sau khi ban quản trị phê duyệt, tài liệu sẽ hiển thị công khai trên StudyHub.
             </p>
           </div>
@@ -222,16 +213,19 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
             {/* STEP 1: Chọn file */}
             {step === 1 && (
               <div className="space-y-3">
-                <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Bước 1: Chọn file từ thiết bị</Label>
-                <label className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-primary/50 dark:hover:border-primary/60 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-2xl cursor-pointer transition-all">
-                  <UploadCloud className="w-10 h-10 text-slate-400 dark:text-slate-500 mb-2" />
-                  <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Nhấp để tải file lên hoặc kéo thả vào đây</span>
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Hỗ trợ file: PDF, DOCX, PPTX, XLSX, TXT (tối đa 25MB)</span>
+                <Label className="text-xs font-semibold text-foreground ">Bước 1: Chọn file từ thiết bị</Label>
+                <label onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
+                  event.preventDefault();
+                  handleFileSelect(event.dataTransfer.files?.[0]);
+                }} className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted rounded-2xl cursor-pointer transition-all">
+                  <UploadCloud className="w-10 h-10 text-muted-foreground mb-2" />
+                  <span className="text-xs font-semibold text-foreground ">Nhấp để tải file lên hoặc kéo thả vào đây</span>
+                  <span className="text-[11px] text-muted-foreground mt-1">Hỗ trợ file: PDF, DOCX, PPTX, XLSX, TXT (tối đa 25MB)</span>
                   <input
                     type="file"
                     accept=".pdf,.docx,.pptx,.xlsx,.txt"
                     className="hidden"
-                    onChange={handleFileChange}
+                    onChange={(event) => handleFileSelect(event.target.files?.[0])}
                   />
                 </label>
               </div>
@@ -241,12 +235,12 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
             {step === 2 && (
               <div className="space-y-3">
                 {file && (
-                  <div className="flex items-center justify-between p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800/60 text-xs">
-                    <span className="font-semibold text-emerald-900 dark:text-emerald-300 truncate max-w-xs">{file.name}</span>
+                  <div className="flex items-center justify-between p-2.5 bg-primary/10 rounded-xl border border-primary text-xs">
+                    <span className="font-semibold text-primary truncate max-w-xs">{file.name}</span>
                     <button
                       type="button"
                       onClick={() => setStep(1)}
-                      className="text-emerald-700 dark:text-emerald-400 hover:underline font-medium text-[11px]"
+                      className="text-primary hover:underline font-medium text-[11px]"
                     >
                       Đổi file
                     </button>
@@ -254,22 +248,23 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
                 )}
 
                 <div className="space-y-1">
-                  <Label htmlFor="upload-title" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <Label htmlFor="upload-title" className="text-xs font-semibold text-foreground ">
                     Tiêu đề tài liệu *
                   </Label>
                   <Input
                     id="upload-title"
+                    maxLength={200}
                     placeholder="Ví dụ: Đề cương ôn tập Giải tích 1 kỳ 2024.2 có đáp án..."
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     required
-                    className="h-10 text-xs rounded-xl bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                    className="h-10 text-xs rounded-xl bg-card border-border text-foreground "
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label htmlFor="upload-subject" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <Label htmlFor="upload-subject" className="text-xs font-semibold text-foreground ">
                       Học phần / Môn học *
                     </Label>
                     <select
@@ -277,7 +272,7 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
                       required
-                      className="w-full h-10 px-3 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      className="w-full h-10 px-3 text-xs bg-card border border-border text-foreground rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     >
                       <option value="">-- Chọn môn học --</option>
                       {subjectOptions.map((sub, i) => (
@@ -287,14 +282,14 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
                   </div>
 
                   <div className="space-y-1">
-                    <Label htmlFor="upload-type" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <Label htmlFor="upload-type" className="text-xs font-semibold text-foreground ">
                       Dạng tài liệu
                     </Label>
                     <select
                       id="upload-type"
                       value={docType}
                       onChange={(e) => setDocType(e.target.value)}
-                      className="w-full h-10 px-3 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      className="w-full h-10 px-3 text-xs bg-card border border-border text-foreground rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     >
                       <option value="Đề thi">Đề thi / Kiểm tra</option>
                       <option value="Đề cương">Đề cương ôn tập</option>
@@ -305,7 +300,7 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="upload-desc" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <Label htmlFor="upload-desc" className="text-xs font-semibold text-foreground ">
                     Mô tả ngắn gọn (tùy chọn)
                   </Label>
                   <textarea
@@ -314,7 +309,7 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
                     placeholder="Tóm tắt nội dung chính của tài liệu..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="w-full p-2.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    className="w-full p-2.5 text-xs bg-card text-foreground rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                   />
                 </div>
               </div>
@@ -323,29 +318,29 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
             {/* STEP 3: Xác nhận gửi kiểm duyệt */}
             {step === 3 && (
               <div className="space-y-4">
-                <div className="p-4 bg-slate-50 dark:bg-slate-800/70 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2 text-xs">
-                  <h5 className="font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2">Xem lại thông tin đăng tải</h5>
+                <div className="p-4 bg-muted rounded-2xl border border-border space-y-2 text-xs">
+                  <h5 className="font-bold text-foreground border-b border-border pb-2">Xem lại thông tin đăng tải</h5>
                   <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">Tiêu đề:</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 text-right max-w-xs truncate">{title}</span>
+                    <span className="text-muted-foreground ">Tiêu đề:</span>
+                    <span className="font-semibold text-foreground text-right max-w-xs truncate">{title}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">Môn học:</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">{subject}</span>
+                    <span className="text-muted-foreground ">Môn học:</span>
+                    <span className="font-semibold text-foreground ">{subject}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">Phân loại:</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">{docType}</span>
+                    <span className="text-muted-foreground ">Phân loại:</span>
+                    <span className="font-semibold text-foreground ">{docType}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-slate-400">Tên file:</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-xs">{file?.name}</span>
+                    <span className="text-muted-foreground ">Tên file:</span>
+                    <span className="font-semibold text-foreground truncate max-w-xs">{file?.name}</span>
                   </div>
                 </div>
 
                 {/* Moderation Policy Notice */}
-                <div className="p-3.5 bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/60 rounded-xl flex items-start gap-2.5 text-xs text-blue-900 dark:text-blue-300">
-                  <ShieldCheck className="w-4 h-4 text-blue-700 dark:text-blue-400 shrink-0 mt-0.5" />
+                <div className="p-3.5 bg-accent/10 border border-primary/80 rounded-xl flex items-start gap-2.5 text-xs text-primary ">
+                  <ShieldCheck className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                   <p className="leading-relaxed">
                     <strong>Quy trình kiểm duyệt:</strong> Tài liệu sẽ được ban quản trị kiểm tra tính chính xác và tuân thủ quy định trước khi hiển thị công khai trên hệ thống.
                   </p>
@@ -354,14 +349,14 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
             )}
 
             {/* Dialog Action Buttons */}
-            <DialogFooter className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <DialogFooter className="flex items-center justify-between gap-2 pt-2 border-t border-border ">
               {step > 1 ? (
-                <Button type="button" variant="outline" size="sm" onClick={handlePrevStep} disabled={loading} className="border-slate-200 dark:border-slate-700 dark:text-slate-300">
+                <Button type="button" variant="outline" size="sm" onClick={handlePrevStep} disabled={loading} className="border-border ">
                   <ArrowLeft className="w-3.5 h-3.5 mr-1" />
                   Quay lại
                 </Button>
               ) : (
-                <Button type="button" variant="outline" size="sm" onClick={handleCloseModal} className="border-slate-200 dark:border-slate-700 dark:text-slate-300">
+                <Button type="button" variant="outline" size="sm" onClick={handleCloseModal} className="border-border ">
                   Hủy
                 </Button>
               )}
@@ -371,7 +366,7 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
                   type="button"
                   size="sm"
                   onClick={handleNextStep}
-                  className="bg-primary hover:bg-primary/90 text-white"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   <span>Tiếp tục</span>
                   <ArrowRight className="w-3.5 h-3.5 ml-1" />
@@ -382,7 +377,7 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
                   size="sm"
                   onClick={handleSubmit}
                   disabled={loading}
-                  className="bg-primary hover:bg-primary/90 text-white font-semibold"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
                 >
                   {loading ? (
                     <span className="flex items-center gap-1.5">

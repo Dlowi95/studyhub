@@ -1,9 +1,11 @@
 const path = require("path");
 const cloudinary = require("../config/cloudinary");
 const Document = require("../models/Document");
-const Notification = require("../models/Notification");
-const Review = require("../models/review");
-const Report = require("../models/report");
+const mongoose = require("mongoose");
+const { buildPublicDocumentQuery, searchPattern } = require("../utils/documentQuery");
+const { resolveSubject } = require("../utils/resolveSubject");
+const { removeDocument } = require("../utils/removeDocument");
+const { applyModerationNote } = require("../utils/moderationNote");
 const { deleteDocumentPhysicalFile } = require("../utils/fileCleanup");
 const { validateDocumentFile } = require("../utils/documentFileValidation");
 const { checkDocumentSource, saveBufferToGridFs } = require("../utils/documentStorage");
@@ -15,6 +17,14 @@ const {
   notifyDocumentStatus,
   notifyDocumentSubmitted,
 } = require("../utils/notificationService");
+const { claimInteraction } = require("../utils/trackDocumentInteraction");
+
+const getInteractionSession = (req) => {
+  if (!req?.headers) return null;
+  const explicit = req.headers["x-studyhub-session"];
+  if (explicit) return explicit;
+  return `${req.ip || "anonymous"}:${req.headers["user-agent"] || ""}`;
+};
 
 const sanitizeFileName = (name = "") => {
   const extension = path.extname(name || "");
@@ -42,6 +52,8 @@ const saveToGridFs = async (file, req) => {
 };
 
 exports.uploadDocument = async (req, res) => {
+  let storedSource;
+  let saved = false;
   try {
     const { title, description, subjectId, subjectName, tags } = req.body;
     const uploaderId = req.user?._id;
@@ -50,18 +62,24 @@ exports.uploadDocument = async (req, res) => {
       return res.status(400).json({ message: "Vui lòng chọn file để upload" });
     }
 
-    if (!title || (!subjectId && !subjectName)) {
+    if (typeof title !== "string" || !title.trim() || title.trim().length > 200) {
       return res.status(400).json({
-        message: "Thiếu title hoặc môn học",
+        message: "Tiêu đề phải từ 1 đến 200 ký tự",
       });
+    }
+    if (description !== undefined && (typeof description !== "string" || description.length > 10000)) {
+      return res.status(400).json({ message: "Mô tả tối đa 10.000 ký tự" });
+    }
+    const subject = await resolveSubject(subjectId, subjectName);
+    const parsedTags = Array.isArray(tags) ? tags : typeof tags === "string" ? tags.split(",") : [];
+    if (parsedTags.length > 20 || parsedTags.some((tag) => typeof tag !== "string" || tag.length > 80)) {
+      return res.status(400).json({ message: "Tối đa 20 từ khóa, mỗi từ khóa tối đa 80 ký tự" });
     }
 
     const fileValidation = validateDocumentFile(req.file);
     if (!fileValidation.valid) {
       return res.status(400).json({ message: fileValidation.message });
     }
-
-    let storedSource;
 
     if (cloudinary.isConfigured) {
       try {
@@ -95,26 +113,22 @@ exports.uploadDocument = async (req, res) => {
     }
 
     const doc = new Document({
-      title,
-      description: description || "",
+      title: title.trim(),
+      description: description?.trim() || "",
       fileUrl: storedSource.fileUrl,
       fileName: req.file.originalname,
       fileType: fileValidation.fileType,
       fileSize: req.file.size || 0,
       storageProvider: storedSource.storageProvider,
       storageKey: storedSource.storageKey,
-      subjectId: subjectId || null,
-      subjectName: subjectName || "Khác",
+      ...subject,
       uploaderId: uploaderId || null,
-      tags: Array.isArray(tags)
-        ? tags
-        : tags
-          ? tags.split(",").map((t) => t.trim()).filter(Boolean)
-          : [],
+      tags: [...new Set(parsedTags.map((tag) => tag.trim()).filter(Boolean))],
       status: "pending",
     });
 
     await doc.save();
+    saved = true;
     await notifyDocumentSubmitted(doc).catch((notificationError) => {
       console.error("Không thể tạo thông báo tài liệu mới:", notificationError.message);
     });
@@ -124,9 +138,10 @@ exports.uploadDocument = async (req, res) => {
       document: doc,
     });
   } catch (error) {
+    if (storedSource && !saved) await deleteDocumentPhysicalFile(storedSource);
     console.error(error);
-    return res.status(500).json({
-      message: "Lỗi upload tài liệu",
+    return res.status(error.status || 500).json({
+      message: error.status ? error.message : "Lỗi upload tài liệu",
       error: error.message,
     });
   }
@@ -134,52 +149,15 @@ exports.uploadDocument = async (req, res) => {
 
 exports.getDocuments = async (req, res) => {
   try {
-    const {
-      status,
-      q,
-      subject,
-      fileType,
-      type,
-      page = 1,
-      limit = 20,
-    } = req.query;
-
-    const query = {};
-
-    if (status) query.status = status;
-
-    if (subject) {
-      query.subjectName = { $regex: String(subject).trim(), $options: "i" };
-    }
-
-    const normalizedType = fileType || type;
-    if (normalizedType) {
-      query.fileType = { $regex: `^${String(normalizedType).trim()}$`, $options: "i" };
-    }
-
-    const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const perPage = Math.max(1, parseInt(limit, 10) || 20);
-
-    let docsQuery;
-    if (q && q.trim()) {
-      const searchTerm = q.trim();
-      docsQuery = Document.find(
-        {
-          ...query,
-          $text: { $search: searchTerm },
-        },
-        { score: { $meta: "textScore" } }
-      ).sort({ score: { $meta: "textScore" }, createdAt: -1 });
-    } else {
-      docsQuery = Document.find(query).sort({ createdAt: -1 });
-    }
+    const { query, sort, page: pageNum, limit: perPage } = buildPublicDocumentQuery(req.query);
+    const docsQuery = Document.find(query).sort(sort);
 
     const [docs, total] = await Promise.all([
       docsQuery
         .skip((pageNum - 1) * perPage)
         .limit(perPage)
-        .populate("uploaderId", "name email"),
-      docsQuery.clone().countDocuments(),
+        .populate("uploaderId", "name"),
+      Document.countDocuments(query),
     ]);
 
     const items = await Promise.all(
@@ -202,19 +180,46 @@ exports.getDocuments = async (req, res) => {
       totalPages: Math.ceil(total / perPage),
     });
   } catch (error) {
-    return res.status(500).json({
-      message: "Lỗi lấy danh sách tài liệu",
+    return res.status(error.status || 500).json({
+      message: error.status ? error.message : "Lỗi lấy danh sách tài liệu",
       error: error.message,
     });
   }
 };
 
+exports.getSearchSuggestions = async (req, res) => {
+  try {
+    const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 200) : "";
+    if (q.length < 2) return res.json({ documents: [], subjects: [] });
+    const { query } = buildPublicDocumentQuery(req.query);
+    const titleMatch = { title: { $regex: searchPattern(q), $options: "i" } };
+    const projection = "title subjectName fileType";
+    const [titleDocuments, otherDocuments, subjects] = await Promise.all([
+      Document.find({ $and: [query, titleMatch] }).sort({ downloadCount: -1, createdAt: -1, _id: -1 }).limit(6).select(projection).lean(),
+      Document.find(query).sort({ downloadCount: -1, createdAt: -1, _id: -1 }).limit(6).select(projection).lean(),
+      Document.aggregate([
+        { $match: { $and: [query, { subjectName: { $regex: searchPattern(q), $options: "i" } }] } },
+        { $group: { _id: "$subjectName", count: { $sum: 1 } } },
+        { $sort: { count: -1, _id: 1 } }, { $limit: 3 },
+        { $project: { _id: 0, name: "$_id", count: 1 } },
+      ]),
+    ]);
+    const unique = new Map([...titleDocuments, ...otherDocuments].map((doc) => [String(doc._id), doc]));
+    return res.json({ documents: [...unique.values()].slice(0, 6), subjects });
+  } catch (error) {
+    return res.status(error.status || 500).json({ message: error.status ? error.message : "Chưa tải được gợi ý tìm kiếm" });
+  }
+};
+
 exports.getDocumentById = async (req, res) => {
   try {
+    if (!mongoose.isObjectIdOrHexString(req.params.id)) {
+      return res.status(400).json({ message: "Mã tài liệu không hợp lệ" });
+    }
     const doc = await Document.findById(req.params.id)
-      .populate("uploaderId", "name email");
+      .populate("uploaderId", "name");
 
-    if (!doc) {
+    if (!doc || doc.status !== "approved") {
       return res.status(404).json({ message: "Không tìm thấy tài liệu" });
     }
 
@@ -270,6 +275,7 @@ exports.updateDocumentStatus = async (req, res) => {
     }
 
     const previousStatus = doc.status;
+    applyModerationNote(doc, status, req.body.moderationNote);
     doc.status = status;
     await doc.save();
     if (previousStatus !== status) {
@@ -283,8 +289,8 @@ exports.updateDocumentStatus = async (req, res) => {
       document: doc,
     });
   } catch (error) {
-    return res.status(500).json({
-      message: "Lỗi cập nhật trạng thái",
+    return res.status(error.status || 500).json({
+      message: error.status ? error.message : "Lỗi cập nhật trạng thái",
       error: error.message,
     });
   }
@@ -292,8 +298,10 @@ exports.updateDocumentStatus = async (req, res) => {
 
 exports.getDocumentStats = async (req, res) => {
   try {
+    const match = req.user && ["admin", "moderator"].includes(req.user.role) ? {} : { status: "approved" };
     const [stats, bySubject, monthlyUploads] = await Promise.all([
       Document.aggregate([
+        { $match: match },
         {
           $group: {
             _id: null,
@@ -309,10 +317,14 @@ exports.getDocumentStats = async (req, res) => {
             },
             totalViews: { $sum: "$viewCount" },
             totalDownloads: { $sum: "$downloadCount" },
+            subjectNames: { $addToSet: "$subjectName" },
           },
         },
+        { $set: { totalSubjects: { $size: "$subjectNames" } } },
+        { $unset: "subjectNames" },
       ]),
       Document.aggregate([
+        { $match: match },
         { $group: { _id: "$subjectName", count: { $sum: 1 }, views: { $sum: "$viewCount" }, downloads: { $sum: "$downloadCount" } } },
         { $sort: { count: -1, views: -1 } },
         { $limit: 10 },
@@ -320,6 +332,7 @@ exports.getDocumentStats = async (req, res) => {
       Document.aggregate([
         {
           $match: {
+            ...match,
             createdAt: {
               $gte: new Date(new Date().getFullYear(), new Date().getMonth() - 7, 1),
             },
@@ -359,6 +372,7 @@ exports.getDocumentStats = async (req, res) => {
         rejected: 0,
         totalViews: 0,
         totalDownloads: 0,
+        totalSubjects: 0,
       },
       bySubject,
       monthlyUploads: uploadsByMonth,
@@ -373,8 +387,13 @@ exports.getDocumentStats = async (req, res) => {
 
 exports.incrementView = async (req, res) => {
   try {
-    const doc = await Document.findByIdAndUpdate(
-      req.params.id,
+    if (!mongoose.isObjectIdOrHexString(req.params.id)) return res.status(400).json({ message: "Mã tài liệu không hợp lệ" });
+    const sessionId = getInteractionSession(req);
+    if (sessionId && !(await claimInteraction({ documentId: req.params.id, type: "view", sessionId }))) {
+      return res.json({ message: "Lượt xem đã được ghi nhận gần đây", counted: false });
+    }
+    const doc = await Document.findOneAndUpdate(
+      { _id: req.params.id, status: "approved" },
       { $inc: { viewCount: 1 } },
       { new: true }
     );
@@ -383,7 +402,7 @@ exports.incrementView = async (req, res) => {
       return res.status(404).json({ message: "Tài liệu không tồn tại" });
     }
 
-    return res.json({ message: "Đã tăng lượt xem", document: doc });
+    return res.json({ message: "Đã tăng lượt xem", counted: true, document: doc });
   } catch (error) {
     return res.status(500).json({ message: "Lỗi tăng lượt xem", error: error.message });
   }
@@ -391,8 +410,13 @@ exports.incrementView = async (req, res) => {
 
 exports.incrementDownload = async (req, res) => {
   try {
-    const doc = await Document.findByIdAndUpdate(
-      req.params.id,
+    if (!mongoose.isObjectIdOrHexString(req.params.id)) return res.status(400).json({ message: "Mã tài liệu không hợp lệ" });
+    const sessionId = getInteractionSession(req);
+    if (sessionId && !(await claimInteraction({ documentId: req.params.id, type: "download", sessionId }))) {
+      return res.json({ message: "Lượt tải đã được ghi nhận gần đây", counted: false });
+    }
+    const doc = await Document.findOneAndUpdate(
+      { _id: req.params.id, status: "approved" },
       { $inc: { downloadCount: 1 } },
       { new: true }
     );
@@ -401,7 +425,7 @@ exports.incrementDownload = async (req, res) => {
       return res.status(404).json({ message: "Tài liệu không tồn tại" });
     }
 
-    return res.json({ message: "Đã tăng lượt tải", document: doc });
+    return res.json({ message: "Đã tăng lượt tải", counted: true, document: doc });
   } catch (error) {
     return res.status(500).json({ message: "Lỗi tăng lượt tải", error: error.message });
   }
@@ -444,15 +468,7 @@ exports.deleteMyDocument = async (req, res) => {
       return res.status(403).json({ message: "Bạn không có quyền xoá tài liệu này" });
     }
 
-    // Xóa file vật lý và cascade xóa reviews, reports liên quan
-    await Promise.allSettled([
-      deleteDocumentPhysicalFile(doc),
-      Review.deleteMany({ documentId: id }),
-      Report.deleteMany({ documentId: id }),
-      Notification.deleteMany({ relatedDocumentId: id }),
-    ]);
-
-    await Document.findByIdAndDelete(id);
+    await removeDocument(doc);
     return res.json({ message: "Xoá tài liệu thành công" });
   } catch (error) {
     return res.status(500).json({

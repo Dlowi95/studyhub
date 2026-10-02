@@ -9,6 +9,7 @@ import ReportModal from "@/components/ReportModal";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { normalizeFileUrl } from "@/lib/file-url";
+import { interactionHeaders } from "@/lib/interaction";
 import {
   ChevronRight,
   FileText,
@@ -112,6 +113,7 @@ export default function DocumentDetailPage() {
         const normalizedDoc = normalizeDocument(detailData);
         setDoc(normalizedDoc);
         setAvgRating(normalizedDoc.avgRating);
+        void fetch(`${apiUrl}/documents/${id}/view`, { method: "POST", headers: interactionHeaders() }).catch(() => {});
         setFileAvailability({
           state: normalizedDoc.fileAvailable === false ? "missing" : "checking",
           message: normalizedDoc.fileIssue || "",
@@ -240,7 +242,7 @@ export default function DocumentDetailPage() {
     }
 
     try {
-      const counterResponse = await fetch(`${apiUrl}/documents/${docItem.id}/download`, { method: "POST" });
+      const counterResponse = await fetch(`${apiUrl}/documents/${docItem.id}/download`, { method: "POST", headers: interactionHeaders() });
       if (counterResponse.ok) {
         const counterData = await counterResponse.json();
         setDoc((prev) =>
@@ -268,9 +270,9 @@ export default function DocumentDetailPage() {
   if (loading) {
     return (
       <div className="mx-auto max-w-6xl py-16 px-4">
-        <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-12 text-center space-y-3 shadow-xs">
+        <div className="rounded-3xl border border-border/80 bg-card p-12 text-center space-y-3 shadow-xs">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Đang tải thông tin tài liệu...</p>
+          <p className="text-sm font-medium text-muted-foreground ">Đang tải thông tin tài liệu...</p>
         </div>
       </div>
     );
@@ -279,18 +281,18 @@ export default function DocumentDetailPage() {
   if (error || !doc) {
     return (
       <div className="mx-auto max-w-4xl py-16 px-4">
-        <div className="rounded-3xl border border-red-200 dark:border-red-900/50 bg-red-50/70 dark:bg-red-950/30 p-8 text-center space-y-4 shadow-xs">
-          <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto">
+        <div className="rounded-3xl border border-destructive bg-destructive/10 p-8 text-center space-y-4 shadow-xs">
+          <div className="w-12 h-12 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center mx-auto">
             <AlertTriangle className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-red-900 dark:text-red-300">Không thể tải tài liệu</h2>
-            <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+            <h2 className="text-lg font-bold text-destructive ">Không thể tải tài liệu</h2>
+            <p className="mt-1 text-xs text-destructive ">
               {error || "Tài liệu này không tồn tại hoặc đã bị gỡ bỏ."}
             </p>
           </div>
           <Link to="/" className="inline-block pt-2">
-            <Button variant="outline" className="rounded-xl border-slate-300 dark:border-slate-700 text-xs font-semibold">
+            <Button variant="outline" className="rounded-xl border-border text-xs font-semibold">
               Quay lại trang chủ
             </Button>
           </Link>
@@ -302,34 +304,34 @@ export default function DocumentDetailPage() {
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6 text-left pb-16">
       {/* 1. BREADCRUMBS NAVIGATION */}
-      <nav className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 overflow-x-auto pb-1">
-        <Link to="/" className="hover:text-primary dark:hover:text-primary transition-colors whitespace-nowrap">
+      <nav className="flex items-center gap-1.5 text-xs text-muted-foreground overflow-x-auto pb-1">
+        <Link to="/" className="hover:text-primary transition-colors whitespace-nowrap">
           Trang chủ
         </Link>
-        <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 shrink-0" />
-        <span className="text-slate-400 dark:text-slate-500 whitespace-nowrap">Học phần</span>
-        <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 shrink-0" />
-        <span className="font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">
+        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <span className="text-muted-foreground whitespace-nowrap">Học phần</span>
+        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <span className="font-semibold text-foreground whitespace-nowrap">
           {doc.subjectName || "Khác"}
         </span>
-        <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 shrink-0" />
-        <span className="text-slate-400 dark:text-slate-500 truncate max-w-[200px]">{doc.title}</span>
+        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <span className="text-muted-foreground truncate max-w-[200px]">{doc.title}</span>
       </nav>
 
       {/* 2. DOCUMENT STATUS BANNER */}
       <div
         className={`rounded-2xl border p-3.5 px-4 flex items-center justify-between gap-3 shadow-xs ${
           fileUnavailable
-            ? "border-amber-300/90 bg-amber-50/90 dark:border-amber-800/70 dark:bg-amber-950/30"
-            : "border-emerald-200/90 bg-emerald-50/80 dark:border-emerald-800/60 dark:bg-emerald-950/40"
+            ? "border-warning/90 bg-warning/10 "
+            : "border-primary/90 bg-primary/10 "
         }`}
       >
         <div className="flex items-center gap-2.5">
           <div
             className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border ${
               fileUnavailable
-                ? "border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
-                : "border-emerald-200/80 bg-emerald-100 text-emerald-700 dark:border-emerald-800/80 dark:bg-emerald-900/60 dark:text-emerald-300"
+                ? "border-warning bg-warning/10 text-warning "
+                : "border-primary/80 bg-primary/10 text-primary "
             }`}
           >
             {fileUnavailable ? (
@@ -341,20 +343,20 @@ export default function DocumentDetailPage() {
           <p
             className={`text-xs font-medium ${
               fileUnavailable
-                ? "text-amber-900 dark:text-amber-200"
-                : "text-emerald-900 dark:text-emerald-200"
+                ? "text-warning "
+                : "text-primary "
             }`}
           >
             {fileUnavailable
               ? "Nội dung đã từng được duyệt, nhưng tệp nguồn hiện không còn khả dụng."
-              : "Tài liệu học tập đã được kiểm duyệt an toàn — Sẵn sàng tải về và học tập."}
+              : "Nội dung đã được duyệt — Bạn có thể xem trước để chọn đúng tài liệu."}
           </p>
         </div>
         <span
-          className={`hidden sm:inline-block text-[11px] font-semibold bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border shadow-2xs whitespace-nowrap ${
+          className={`hidden sm:inline-block text-[11px] font-semibold bg-card  px-2.5 py-1 rounded-lg border shadow-2xs whitespace-nowrap ${
             fileUnavailable
-              ? "border-amber-300/80 text-amber-700 dark:border-amber-800/80 dark:text-amber-300"
-              : "border-emerald-200/80 text-emerald-700 dark:border-emerald-800/80 dark:text-emerald-300"
+              ? "border-warning/80 text-warning "
+              : "border-primary/80 text-primary "
           }`}
         >
           {fileUnavailable ? "Cần tải lại tệp" : "Đã xác thực"}
@@ -362,19 +364,19 @@ export default function DocumentDetailPage() {
       </div>
 
       {/* 3. MAIN 2-COLUMN BENTO GRID */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="detail-grid">
         {/* LEFT COLUMN: DOCUMENT MAIN BODY (2 COLS) */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="detail-main">
           {/* Header Card */}
-          <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 md:p-8 shadow-xs space-y-6">
+          <div className="detail-info paper-panel p-5 md:p-8 space-y-6">
             <DocumentDetailHeader doc={doc} />
 
             {/* Document Description */}
-            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 p-5 space-y-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            <div className="rounded-2xl border border-border bg-muted/70 p-5 space-y-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground ">
                 Thông tin & Giới thiệu tài liệu
               </span>
-              <p className="text-xs md:text-sm leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-line">
+              <p className="text-xs md:text-sm leading-relaxed text-foreground whitespace-pre-line">
                 {doc.description ? doc.description : "Tài liệu này chưa có phần mô tả chi tiết."}
               </p>
             </div>
@@ -384,11 +386,11 @@ export default function DocumentDetailPage() {
           </div>
 
           {/* Interactive Document Preview Box */}
-          <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 md:p-8 shadow-xs space-y-4">
+          <div className="detail-preview paper-panel p-5 md:p-8 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <h3 className="font-bold text-slate-900 dark:text-white text-sm md:text-base">
+                <FileText className="w-4 h-4 text-primary " />
+                <h3 className="font-bold text-foreground text-sm md:text-base">
                   Xem trước tài liệu
                 </h3>
               </div>
@@ -403,7 +405,7 @@ export default function DocumentDetailPage() {
                       window.open(normalizeFileUrl(doc.fileUrl), "_blank", "noopener,noreferrer");
                     }
                   }}
-                  className="rounded-xl border-slate-200 dark:border-slate-700 text-xs font-semibold gap-1.5 h-8 hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300"
+                  className="rounded-xl border-border text-xs font-semibold gap-1.5 h-8 hover:bg-muted "
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   Mở tab mới
@@ -420,25 +422,31 @@ export default function DocumentDetailPage() {
 
           {/* Reviews & Ratings Section (Real Data) */}
           {doc.status === "approved" && (
+            <div className="detail-reviews">
             <DocumentDetailReviews
               documentId={doc.id}
               avgRating={avgRating}
-              onAvgRatingChange={(newAvg) => setAvgRating(newAvg)}
+              key={doc.id}
+              onAvgRatingChange={(newAvg) => {
+                setAvgRating(newAvg);
+                setDoc((previous) => ({ ...previous, avgRating: newAvg }));
+              }}
             />
+            </div>
           )}
         </div>
 
         {/* RIGHT COLUMN: STICKY SIDEBAR (1 COL) */}
-        <div className="space-y-6 lg:sticky lg:top-20">
+        <div className="detail-sidebar space-y-6">
           {/* Quick Actions Card */}
-          <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_18px_45px_-32px_rgba(15,23,42,0.45)] dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center gap-3 border-b border-slate-100 bg-gradient-to-br from-slate-50 to-emerald-50/50 px-5 py-4 dark:border-slate-800 dark:from-slate-900 dark:to-emerald-950/20">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-950/70 dark:text-emerald-300 dark:ring-emerald-900">
+          <div className="overflow-hidden rounded-3xl border border-border/80 bg-card shadow-none ">
+            <div className="flex items-center gap-3 border-b border-border px-5 py-4 ">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/80 ">
                 <FileText className="h-4 w-4" />
               </span>
               <div className="min-w-0">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Tác vụ tài liệu</h3>
-                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                <h3 className="text-sm font-bold text-foreground ">Tác vụ tài liệu</h3>
+                <p className="mt-0.5 text-[11px] text-muted-foreground ">
                   Xem, tải về hoặc lưu lại để ôn tập.
                 </p>
               </div>
@@ -460,10 +468,10 @@ export default function DocumentDetailPage() {
 
           {/* Related Documents in Subject */}
           {relatedDocs.length > 0 && (
-            <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Tài liệu cùng học phần</h3>
-                <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">
+            <div className="rounded-3xl border border-border/80 bg-card p-6 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <h3 className="text-sm font-bold text-foreground ">Tài liệu cùng học phần</h3>
+                <span className="text-xs text-muted-foreground font-medium">
                   {relatedDocs.length} tài liệu
                 </span>
               </div>
@@ -473,15 +481,15 @@ export default function DocumentDetailPage() {
                   <div
                     key={item.id}
                     onClick={() => navigate(`/document/${item.id}`)}
-                    className="p-3 rounded-2xl border border-slate-200/60 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-800/80 hover:border-primary/40 dark:hover:border-primary/50 hover:shadow-xs transition-all cursor-pointer space-y-1.5"
+                    className="p-3 rounded-2xl border border-border/60 bg-muted/50 hover:bg-card hover:border-primary/40 hover:shadow-xs transition-all cursor-pointer space-y-1.5"
                   >
-                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 text-[10px] font-semibold">
+                    <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-semibold">
                       {item.subjectName || "Học phần"}
                     </span>
-                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 line-clamp-2 hover:text-primary dark:hover:text-primary transition-colors">
+                    <h4 className="text-xs font-bold text-foreground line-clamp-2 hover:text-primary transition-colors">
                       {item.title}
                     </h4>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                    <p className="text-[10px] text-muted-foreground ">
                       {item.downloadCount || 0} lượt tải • {item.type}
                     </p>
                   </div>

@@ -15,6 +15,7 @@ const reportRoutes = require("./routes/reportRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");   
 const notificationRoutes = require("./routes/notificationRoutes");
 const fileRoutes = require("./routes/fileRoutes");
+const bookmarkRoutes = require("./routes/bookmarkRoutes");
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -56,6 +57,7 @@ app.use("/api/files", fileRoutes);
 app.use("/api", reportRoutes);   
 app.use("/api", reviewRoutes);
 app.use("/api", notificationRoutes);
+app.use("/api", bookmarkRoutes);
 
 // Base route
 app.get("/", (req, res) => {

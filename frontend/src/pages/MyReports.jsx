@@ -1,3 +1,4 @@
+import PageHeading from "@/components/PageHeading";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -19,21 +20,21 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const STATUS_CONFIG = {
   pending: {
     label: "Đang chờ xử lý",
-    badgeClass: "bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border-amber-300 dark:border-amber-800",
+    badgeClass: "bg-warning/10 text-warning border-warning ",
     icon: Clock,
-    color: "text-amber-500",
+    color: "text-warning",
   },
   resolved: {
     label: "Đã xử lý",
-    badgeClass: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800",
+    badgeClass: "bg-primary/10 text-primary border-primary ",
     icon: CheckCircle2,
-    color: "text-emerald-500",
+    color: "text-primary",
   },
   dismissed: {
     label: "Đã bỏ qua",
-    badgeClass: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700",
+    badgeClass: "bg-muted text-foreground border-border ",
     icon: XCircle,
-    color: "text-slate-400",
+    color: "text-muted-foreground",
   },
 };
 
@@ -95,47 +96,23 @@ export default function MyReports() {
   });
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 space-y-6 text-left">
+    <div className="reports-page page-shell max-w-5xl space-y-6 text-left pb-10">
       {/* Breadcrumbs */}
-      <nav className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-        <Link to="/" className="hover:text-primary dark:hover:text-primary transition-colors">
+      <nav className="flex items-center gap-1.5 text-xs text-muted-foreground ">
+        <Link to="/" className="hover:text-primary transition-colors">
           Trang chủ
         </Link>
-        <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 shrink-0" />
-        <Link to="/profile" className="hover:text-primary dark:hover:text-primary transition-colors">
+        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <Link to="/profile" className="hover:text-primary transition-colors">
           Hồ sơ cá nhân
         </Link>
-        <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 shrink-0" />
-        <span className="font-semibold text-slate-800 dark:text-slate-200">Báo cáo của tôi</span>
+        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <span className="font-semibold text-foreground ">Báo cáo của tôi</span>
       </nav>
 
-      {/* Header Banner */}
-      <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 md:p-8 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0 border border-red-200 dark:border-red-900/40">
-            <ShieldAlert className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-              Báo cáo vi phạm của tôi
-            </h1>
-            <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Theo dõi tiến độ, tình trạng xử lý và phản hồi từ ban quản trị StudyHub cho các tài liệu bạn đã báo cáo.
-            </p>
-          </div>
-        </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={fetchReports}
-          disabled={loading}
-          className="rounded-xl border-slate-200 dark:border-slate-800 text-xs font-semibold gap-2 self-start sm:self-auto"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-primary" : ""}`} />
-          <span>Làm mới</span>
-        </Button>
-      </div>
+      <PageHeading eyebrow="PHẢN HỒI CỦA BẠN" title="Báo cáo của tôi." description="Theo dõi tiến độ xử lý và phản hồi từ ban quản trị cho những tài liệu bạn đã báo cáo.">
+        <Button variant="outline" size="sm" onClick={fetchReports} disabled={loading} className="rounded-full gap-2"><RefreshCw className={loading ? "animate-spin" : ""} />Làm mới</Button>
+      </PageHeading>
 
       {/* Stat Cards Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
@@ -144,14 +121,14 @@ export default function MyReports() {
           onClick={() => setFilterStatus("all")}
           className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
             filterStatus === "all"
-              ? "bg-primary/5 dark:bg-primary/10 border-primary shadow-xs ring-1 ring-primary"
-              : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+              ? "bg-primary/5 border-primary shadow-xs ring-1 ring-primary"
+              : "bg-card border-border/80 hover:border-border "
           }`}
         >
-          <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+          <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
             Tổng báo cáo
           </div>
-          <div className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">
+          <div className="text-2xl font-extrabold text-foreground mt-1">
             {counts.all}
           </div>
         </button>
@@ -161,15 +138,15 @@ export default function MyReports() {
           onClick={() => setFilterStatus("pending")}
           className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
             filterStatus === "pending"
-              ? "bg-amber-50 dark:bg-amber-950/30 border-amber-500 shadow-xs ring-1 ring-amber-500"
-              : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-amber-300 dark:hover:border-amber-800/80"
+              ? "bg-warning/10 border-warning shadow-xs ring-1 ring-warning"
+              : "bg-card border-border/80 hover:border-warning "
           }`}
         >
-          <div className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+          <div className="text-[11px] font-bold text-warning uppercase tracking-wider flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5" />
             <span>Chờ xử lý</span>
           </div>
-          <div className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 mt-1">
+          <div className="text-2xl font-extrabold text-warning mt-1">
             {counts.pending}
           </div>
         </button>
@@ -179,15 +156,15 @@ export default function MyReports() {
           onClick={() => setFilterStatus("resolved")}
           className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
             filterStatus === "resolved"
-              ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 shadow-xs ring-1 ring-emerald-500"
-              : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-800/80"
+              ? "bg-primary/10 border-primary shadow-xs ring-1 ring-primary"
+              : "bg-card border-border/80 hover:border-primary "
           }`}
         >
-          <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+          <div className="text-[11px] font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Đã xử lý</span>
           </div>
-          <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">
+          <div className="text-2xl font-extrabold text-primary mt-1">
             {counts.resolved}
           </div>
         </button>
@@ -197,48 +174,48 @@ export default function MyReports() {
           onClick={() => setFilterStatus("dismissed")}
           className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
             filterStatus === "dismissed"
-              ? "bg-slate-100 dark:bg-slate-800/80 border-slate-500 shadow-xs ring-1 ring-slate-500"
-              : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-400 dark:hover:border-slate-600"
+              ? "bg-muted border-border shadow-xs ring-1 ring-primary"
+              : "bg-card border-border/80 hover:border-border "
           }`}
         >
-          <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+          <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
             <XCircle className="w-3.5 h-3.5" />
             <span>Đã bỏ qua</span>
           </div>
-          <div className="text-2xl font-extrabold text-slate-700 dark:text-slate-300 mt-1">
+          <div className="text-2xl font-extrabold text-foreground mt-1">
             {counts.dismissed}
           </div>
         </button>
       </div>
 
       {/* Main Reports List */}
-      <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 md:p-8 shadow-xs space-y-4">
+      <div className="rounded-3xl border border-border/80 bg-card p-6 md:p-8 shadow-xs space-y-4">
         {loading && (
           <div className="py-16 text-center space-y-3">
             <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Đang tải danh sách báo cáo...</p>
+            <p className="text-xs font-medium text-muted-foreground ">Đang tải danh sách báo cáo...</p>
           </div>
         )}
 
         {!loading && error && (
-          <div className="p-6 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/60 text-center space-y-2">
-            <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400 mx-auto" />
-            <p className="text-xs font-semibold text-red-700 dark:text-red-300">{error}</p>
+          <div className="p-6 rounded-2xl bg-destructive/10 border border-destructive text-center space-y-2">
+            <AlertTriangle className="w-6 h-6 text-destructive mx-auto" />
+            <p className="text-xs font-semibold text-destructive ">{error}</p>
           </div>
         )}
 
         {!loading && !error && filteredReports.length === 0 && (
           <div className="py-14 text-center space-y-3">
-            <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+            <div className="w-14 h-14 rounded-2xl bg-muted text-muted-foreground flex items-center justify-center mx-auto">
               <ShieldAlert className="w-7 h-7" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              <h3 className="text-sm font-bold text-foreground ">
                 {filterStatus === "all"
                   ? "Bạn chưa gửi báo cáo vi phạm nào"
                   : `Không có báo cáo nào ở trạng thái này`}
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
                 Khi bạn phát hiện tài liệu có nội dung sai lệch, vi phạm bản quyền hoặc spam, hãy dùng tính năng "Báo cáo vi phạm" trên trang tài liệu.
               </p>
             </div>
@@ -256,16 +233,16 @@ export default function MyReports() {
               const statusCfg = STATUS_CONFIG[report.status] || STATUS_CONFIG.pending;
               const StatusIcon = statusCfg.icon;
               const docId = report.documentId?._id || report.documentId?.id || report.documentId;
-              const docTitle = report.documentId?.title || "Tài liệu học tập";
+              const docTitle = report.documentId?.title || report.documentTitle || "Tài liệu học tập";
 
               return (
                 <div
                   key={report._id}
-                  className="p-5 rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800/80 transition-all space-y-3"
+                  className="p-5 rounded-2xl border border-border/70 bg-muted/50 hover:bg-card transition-all space-y-3"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 ${statusCfg.color}`}>
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center bg-card border border-border ${statusCfg.color}`}>
                         <StatusIcon className="w-4 h-4" />
                       </div>
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusCfg.badgeClass}`}>
@@ -273,7 +250,7 @@ export default function MyReports() {
                       </span>
                     </div>
 
-                    <div className="text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-3">
+                    <div className="text-[11px] text-muted-foreground flex items-center gap-3">
                       <span>Gửi ngày: {formatDate(report.createdAt)}</span>
                       {report.resolvedAt && (
                         <span>• Đã xử lý: {formatDate(report.resolvedAt)}</span>
@@ -287,26 +264,26 @@ export default function MyReports() {
                       {report.documentId ? (
                         <Link
                           to={`/document/${docId}`}
-                          className="font-bold text-sm text-slate-900 dark:text-white hover:text-primary dark:hover:text-primary transition-colors flex items-center gap-1.5"
+                          className="font-bold text-sm text-foreground hover:text-primary transition-colors flex items-center gap-1.5"
                         >
                           <span className="line-clamp-1">{docTitle}</span>
                           <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-60" />
                         </Link>
                       ) : (
-                        <span className="text-sm font-semibold text-slate-400 dark:text-slate-500 italic">
+                        <span className="text-sm font-semibold text-muted-foreground italic">
                           Tài liệu đã bị xóa khỏi hệ thống
                         </span>
                       )}
                     </div>
 
-                    <div className="text-xs text-slate-700 dark:text-slate-300 pl-6 space-y-1">
+                    <div className="text-xs text-foreground pl-6 space-y-1">
                       <p>
-                        <span className="font-semibold text-slate-500 dark:text-slate-400">Lý do báo cáo: </span>
+                        <span className="font-semibold text-muted-foreground ">Lý do báo cáo: </span>
                         <span>{report.reason}</span>
                       </p>
 
                       {report.adminFeedback && (
-                        <div className="mt-2 p-3 rounded-xl bg-primary/5 dark:bg-primary/10 border border-primary/20 text-xs text-slate-800 dark:text-slate-200 flex items-start gap-2">
+                        <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/20 text-xs text-foreground flex items-start gap-2">
                           <MessageSquare className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                           <div>
                             <span className="font-bold text-primary">Phản hồi từ Quản trị viên: </span>

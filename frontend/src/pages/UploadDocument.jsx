@@ -1,3 +1,4 @@
+import PageHeading from "@/components/PageHeading";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -13,22 +14,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { fallbackSubjects, validateUploadFile } from "@/lib/documentUpload";
 
-const SUBJECT_OPTIONS = [
-  "Giải tích 1 & 2",
-  "Đại số tuyến tính",
-  "Triết học Mác-Lênin",
-  "Cấu trúc dữ liệu & Giải thuật",
-  "Cơ sở dữ liệu",
-  "Lập trình Web",
-  "Lập trình C/C++",
-  "Mạng máy tính",
-  "Kinh tế vi mô",
-  "Kinh tế vĩ mô",
-  "Vật lý đại cương",
-  "An toàn thông tin",
-  "Khác",
-];
+const SUBJECT_OPTIONS = fallbackSubjects;
 
 const DOC_TYPES = ["Đề thi & Đáp án", "Giáo trình & Sách", "Bài giảng & Slide", "Bài tập lớn / Đồ án", "Tài liệu ôn tập tổng hợp"];
 
@@ -61,7 +49,7 @@ export default function UploadDocument() {
         const savedSubjects = Array.isArray(data.subjects)
           ? data.subjects.map((item) => item.name).filter(Boolean)
           : [];
-        setSubjectOptions([...new Set([...savedSubjects, ...SUBJECT_OPTIONS])]);
+        setSubjectOptions([...new Set(savedSubjects)]);
       })
       .catch(() => {
         if (!cancelled) setSubjectOptions(SUBJECT_OPTIONS);
@@ -75,15 +63,9 @@ export default function UploadDocument() {
   const handleFileSelect = (selectedFile) => {
     if (!selectedFile) return;
 
-    if (selectedFile.size > 25 * 1024 * 1024) {
-      setError("Dung lượng file tối đa là 25MB.");
-      return;
-    }
-
-    const ext = selectedFile.name.split(".").pop().toLowerCase();
-    const validExtensions = ["pdf", "docx", "pptx", "xlsx", "txt"];
-    if (!validExtensions.includes(ext)) {
-      setError("Chỉ chấp nhận file định dạng PDF, DOCX, PPTX, XLSX hoặc TXT.");
+    const validationError = validateUploadFile(selectedFile);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -169,23 +151,23 @@ export default function UploadDocument() {
   if (success) {
     return (
       <div className="min-h-[75vh] flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 text-center shadow-xl space-y-6">
-          <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center mx-auto shadow-sm">
+        <div className="w-full max-w-lg bg-card border border-border rounded-3xl p-8 text-center shadow-xl space-y-6">
+          <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto shadow-sm">
             <CheckCircle2 className="w-8 h-8" />
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            <h2 className="text-2xl font-bold tracking-tight text-foreground ">
               Đăng tải tài liệu thành công!
             </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+            <p className="text-sm text-foreground leading-relaxed">
               Cảm ơn bạn đã đóng góp cho cộng đồng StudyHub. Tài liệu của bạn đã được gửi đến ban quản trị để kiểm duyệt trước khi hiển thị công khai.
             </p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 text-left text-xs space-y-1.5">
-            <div className="font-semibold text-slate-900 dark:text-white text-sm truncate">{title}</div>
-            <div className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
+          <div className="p-4 rounded-2xl bg-muted border border-border/70 text-left text-xs space-y-1.5">
+            <div className="font-semibold text-foreground text-sm truncate">{title}</div>
+            <div className="text-muted-foreground flex items-center gap-2">
               <span>Học phần: {subject === "Khác" ? customSubject : subject}</span>
               <span>•</span>
               <span>{docType}</span>
@@ -220,37 +202,26 @@ export default function UploadDocument() {
   }
 
   return (
-    <div className="min-h-screen py-8 px-4 max-w-4xl mx-auto">
+    <div className="upload-page page-shell max-w-4xl pb-10">
       {/* Top bar back link */}
       <div className="mb-6 flex items-center justify-between">
         <Link
           to="/"
-          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-primary transition-colors"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-foreground hover:text-primary transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Quay lại trang chủ</span>
         </Link>
-        <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+        <div className="flex items-center gap-1.5 text-xs text-primary font-medium">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Kiểm duyệt an toàn 24/7</span>
+          <span>Kiểm duyệt trước khi công khai</span>
         </div>
       </div>
 
-      {/* Header card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xs mb-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1.5">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Đăng tải tài liệu học tập
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-              Chia sẻ đề thi, giáo trình, bài tập lớn và ghi chú để cùng xây dựng cộng đồng sinh viên vững mạnh.
-            </p>
-          </div>
-        </div>
-
+      <PageHeading eyebrow="CHIA SẺ HỌC LIỆU" title="Tài liệu hay, cùng chia sẻ." description="Gửi đề thi, giáo trình hoặc ghi chú của bạn. Ban quản trị sẽ xem xét nội dung trước khi đưa vào thư viện." />
+      <div className="paper-panel p-5 sm:p-8 mb-8">
         {error && (
-          <div className="mt-6 p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 flex items-start gap-3 text-red-700 dark:text-red-400 text-xs">
+          <div className="mt-6 p-4 rounded-2xl bg-destructive/10 border border-destructive flex items-start gap-3 text-destructive text-xs">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <p className="font-medium">{error}</p>
           </div>
@@ -260,11 +231,15 @@ export default function UploadDocument() {
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           {/* File Drag & Drop Box */}
           <div className="space-y-2">
-            <Label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Tệp tài liệu <span className="text-red-500">*</span>
+            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ">
+              Tệp tài liệu <span className="text-destructive">*</span>
             </Label>
 
             <div
+              role="button"
+              tabIndex={0}
+              aria-label="Chọn tệp tài liệu"
+              onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); fileInputRef.current?.click(); } }}
               onDragOver={(e) => {
                 e.preventDefault();
                 setIsDragging(true);
@@ -276,8 +251,8 @@ export default function UploadDocument() {
                 isDragging
                   ? "border-primary bg-primary/5 scale-[1.01]"
                   : file
-                  ? "border-emerald-500/50 bg-emerald-50/40 dark:bg-emerald-950/20"
-                  : "border-slate-300 dark:border-slate-700 hover:border-primary/60 hover:bg-slate-50/60 dark:hover:bg-slate-800/40"
+                  ? "border-primary/50 bg-primary/10 "
+                  : "border-border hover:border-primary/60 hover:bg-muted/60 "
               }`}
             >
               <input
@@ -290,14 +265,14 @@ export default function UploadDocument() {
 
               {file ? (
                 <div className="flex flex-col items-center gap-2">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-xs">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-xs">
                     <FileCheck className="w-6 h-6" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-slate-900 dark:text-white max-w-sm truncate">
+                    <p className="text-sm font-bold text-foreground max-w-[240px] sm:max-w-sm truncate">
                       {file.name}
                     </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {(file.size / 1024 / 1024).toFixed(2)} MB • Nhấp để đổi file khác
                     </p>
                   </div>
@@ -308,10 +283,10 @@ export default function UploadDocument() {
                     <UploadCloud className="w-6 h-6" />
                   </div>
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                    <p className="text-sm font-semibold text-foreground ">
                       Kéo thả tệp tài liệu vào đây hoặc <span className="text-primary underline">chọn tệp từ máy tính</span>
                     </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-muted-foreground ">
                       Hỗ trợ PDF, DOCX, PPTX, XLSX, TXT (Tối đa 25MB)
                     </p>
                   </div>
@@ -323,11 +298,12 @@ export default function UploadDocument() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Tên tài liệu */}
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="title" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Tiêu đề tài liệu <span className="text-red-500">*</span>
+              <Label htmlFor="title" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ">
+                Tiêu đề tài liệu <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="title"
+                maxLength={200}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="VD: Đề cương chi tiết Giải tích 1 kèm lời giải 2026"
@@ -338,14 +314,14 @@ export default function UploadDocument() {
 
             {/* Học phần */}
             <div className="space-y-2">
-              <Label htmlFor="subject" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Học phần / Môn học <span className="text-red-500">*</span>
+              <Label htmlFor="subject" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ">
+                Học phần / Môn học <span className="text-destructive">*</span>
               </Label>
               <select
                 id="subject"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                className="w-full h-11 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full h-11 rounded-xl border border-border bg-card px-3.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 required
               >
                 <option value="">-- Chọn học phần --</option>
@@ -369,14 +345,14 @@ export default function UploadDocument() {
 
             {/* Loại tài liệu */}
             <div className="space-y-2">
-              <Label htmlFor="docType" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <Label htmlFor="docType" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ">
                 Thể loại tài liệu
               </Label>
               <select
                 id="docType"
                 value={docType}
                 onChange={(e) => setDocType(e.target.value)}
-                className="w-full h-11 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full h-11 rounded-xl border border-border bg-card px-3.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 {DOC_TYPES.map((type) => (
                   <option key={type} value={type}>
@@ -388,7 +364,7 @@ export default function UploadDocument() {
 
             {/* Tags */}
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="tags" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <Label htmlFor="tags" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ">
                 Từ khoá / Tags (cách nhau bởi dấu phẩy)
               </Label>
               <Input
@@ -402,7 +378,7 @@ export default function UploadDocument() {
 
             {/* Mô tả */}
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="description" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <Label htmlFor="description" className="text-xs font-bold uppercase tracking-wider text-muted-foreground ">
                 Mô tả chi tiết nội dung tài liệu
               </Label>
               <textarea
@@ -411,12 +387,12 @@ export default function UploadDocument() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Mô tả tóm tắt nội dung tài liệu, cấu trúc tài liệu, dành cho sinh viên khóa nào..."
-                className="w-full p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                className="w-full p-3.5 rounded-2xl border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
               />
             </div>
           </div>
 
-          <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-800">
+          <div className="pt-4 flex items-center justify-end gap-3 border-t border-border ">
             <Link to="/">
               <Button type="button" variant="outline" className="rounded-xl text-xs font-semibold px-5 h-10">
                 Hủy bỏ
