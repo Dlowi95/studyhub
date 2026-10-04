@@ -490,7 +490,11 @@ exports.updateDocumentStatus = async (req, res) => {
 
 exports.getDocumentStats = async (req, res) => {
   try {
-    const match = req.user && ["admin", "moderator"].includes(req.user.role) ? {} : { status: "approved" };
+    const match = req.user?.role === "admin"
+      ? {}
+      : req.user?.role === "moderator"
+        ? { status: "pending" }
+        : { status: "approved" };
     const [stats, bySubject, monthlyUploads, approvedResourceCount] = await Promise.all([
       Document.aggregate([
         { $match: match },

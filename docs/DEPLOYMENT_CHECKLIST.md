@@ -27,6 +27,7 @@
 - Tài liệu cũ có URL `localhost` cần được trỏ lại về API đang deploy. Các URL GridFS và `/uploads` nội bộ đã được frontend chuẩn hóa theo `VITE_API_URL`.
 - Trước khi mở cho người dùng khác, kiểm tra lại file nguồn trong Atlas, đăng nhập, đăng tài liệu, duyệt/từ chối, xem trước, tải, thông báo và báo cáo vi phạm bằng hai tài khoản thử.
 - Thay đổi học phần có dùng MongoDB transaction; MongoDB deployment phải hỗ trợ replica set.
+- Cài đặt bảo trì được lưu trong collection `SystemSetting`; xác nhận tài khoản admin production truy cập được mục “Cài đặt hệ thống”. Để website ở trạng thái hoạt động và mở nhận tài liệu trước khi công bố.
 
 ## Smoke test sau deploy
 
@@ -35,3 +36,6 @@
 3. Đăng nhập bằng tài khoản thử; kiểm tra trang học phần, tài liệu, đánh giá và thông báo.
 4. Tải lên một file nhỏ, duyệt bằng tài khoản quản trị, rồi xem trước/tải file sau khi service khởi động lại.
 5. Xác nhận một request từ origin không nằm trong `CORS_ORIGINS` không nhận được quyền CORS.
+6. Trên staging, bật bảo trì: trang công khai hiển thị thông báo, API health và trang quản trị vẫn hoạt động; tắt bảo trì và xác nhận thư viện tải lại.
+7. Trên staging, tạm ngưng nhận tài liệu: API upload trả `UPLOADS_PAUSED`, còn xem/tải tài liệu đã duyệt vẫn hoạt động; bật lại sau khi thử.
+8. Đăng nhập bằng moderator và xác nhận không mở được danh sách tài khoản, nhật ký toàn hệ thống, danh mục hoặc cài đặt; chỉ tài liệu/báo cáo đang chờ được trả về.

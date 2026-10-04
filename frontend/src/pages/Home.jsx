@@ -34,7 +34,7 @@ const normalizeDocument = (doc) => ({
   availableFormats: doc.availableFormats || [doc.fileType || "FILE"],
 });
 
-export default function Home({ onOpenAuth, user }) {
+export default function Home({ onOpenAuth, user, uploadsEnabled = true }) {
   const navigate = useNavigate();
   const [urlParams] = useSearchParams();
   const location = useLocation();
@@ -59,6 +59,7 @@ export default function Home({ onOpenAuth, user }) {
   const [catalog, setCatalog] = useState([]);
   const [summary, setSummary] = useState(null);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 0 });
+
   const [reloadKey, setReloadKey] = useState(0);
   const [loadedRequestKey, setLoadedRequestKey] = useState('');
   const queryKey = JSON.stringify(filters);
@@ -125,6 +126,7 @@ export default function Home({ onOpenAuth, user }) {
   }, [reloadKey]);
 
   const handleUploadClick = () => {
+    if (!uploadsEnabled) return;
     if (!user) {
       onOpenAuth?.("login");
     } else {

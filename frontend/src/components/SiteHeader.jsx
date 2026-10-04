@@ -4,7 +4,7 @@ import { Bell, CheckCheck, LogOut, Menu, X, UploadCloud, ShieldCheck, ArrowUpRig
 import BrandMark from "./BrandMark";
 import ThemeToggle from "./ThemeToggle";
 
-export default function SiteHeader({ user, token, onOpenAuth, onUpload, onLogout, notifications, unreadCount, onFetchNotifications, onReadAll, onNotificationClick }) {
+export default function SiteHeader({ user, token, onOpenAuth, onUpload, onLogout, notifications, unreadCount, onFetchNotifications, onReadAll, onNotificationClick, uploadsEnabled = true }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notificationRef = useRef(null);
@@ -57,8 +57,8 @@ export default function SiteHeader({ user, token, onOpenAuth, onUpload, onLogout
           {links.map((link) => <Link key={link.to} to={link.to} className={active(link.to) ? "is-active" : ""} aria-current={active(link.to) ? "page" : undefined}>{link.label}</Link>)}
         </nav>
         <div className="site-actions">
-          <button type="button" className="paper-button paper-button-primary header-upload" onClick={authenticated ? onUpload : () => onOpenAuth("login")}>
-            {authenticated ? <><UploadCloud size={16} /><span>Đăng tài liệu</span></> : <>Bắt đầu ngay <ArrowUpRight size={16} /></>}
+          <button type="button" className="paper-button paper-button-primary header-upload" disabled={authenticated && !uploadsEnabled} title={authenticated && !uploadsEnabled ? "Đang tạm ngưng nhận tài liệu mới" : undefined} onClick={authenticated ? onUpload : () => onOpenAuth("login")}>
+            {authenticated ? <><UploadCloud size={16} /><span>{uploadsEnabled ? "Đăng tài liệu" : "Tạm ngưng đăng"}</span></> : <>Bắt đầu ngay <ArrowUpRight size={16} /></>}
           </button>
           <ThemeToggle />
           {authenticated && (
@@ -94,7 +94,7 @@ export default function SiteHeader({ user, token, onOpenAuth, onUpload, onLogout
           {links.map((link) => <Link key={link.to} to={link.to} className={active(link.to) ? "is-active" : ""} onClick={() => setMenuOpen(false)}>{link.label}<ArrowUpRight size={16} /></Link>)}
           {manages && <Link to="/admin">Trang quản trị<ShieldCheck size={16} /></Link>}
           {authenticated && <Link to="/profile">Hồ sơ của tôi<ArrowUpRight size={16} /></Link>}
-          <button type="button" onClick={() => { setMenuOpen(false); authenticated ? onUpload() : onOpenAuth("login"); }}>{authenticated ? "Đăng tài liệu mới" : "Đăng nhập / Đăng ký"}<UploadCloud size={16} /></button>
+          <button type="button" disabled={authenticated && !uploadsEnabled} onClick={() => { setMenuOpen(false); authenticated ? onUpload() : onOpenAuth("login"); }}>{authenticated ? uploadsEnabled ? "Đăng tài liệu mới" : "Tạm ngưng đăng tải" : "Đăng nhập / Đăng ký"}<UploadCloud size={16} /></button>
           {authenticated && <button type="button" onClick={onLogout}>Đăng xuất<LogOut size={16} /></button>}
         </nav>
       )}

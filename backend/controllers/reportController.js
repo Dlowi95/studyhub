@@ -113,11 +113,11 @@ exports.getMyReports = async (req, res) => {
 exports.getAllReports = async (req, res) => {
   try {
     const { status } = req.query;
-    const filter = status ? { status } : {};
+    const filter = req.user?.role === 'moderator' ? { status: 'pending' } : (status ? { status } : {});
 
     const reports = await Report.find(filter)
       .populate('documentId', 'title fileUrl')
-      .populate('reporterId', 'name email')
+      .populate('reporterId', req.user?.role === 'moderator' ? 'name' : 'name email')
       .populate('handledBy', 'name')
       .sort({ createdAt: -1 });
 
@@ -141,6 +141,9 @@ exports.updateReportStatus = async (req, res) => {
     if (action === 'resolve_delete' && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Chỉ quản trị viên được xóa tài liệu' });
     }
+    if (req.user.role === 'moderator' && !['resolve_reject', 'dismiss'].includes(action)) {
+      return res.status(403).json({ message: 'Kiểm duyệt viên chỉ được xử lý hoặc bỏ qua báo cáo đang chờ' });
+    }
     if (adminFeedback !== undefined && (typeof adminFeedback !== 'string' || adminFeedback.length > 2000)) {
       return res.status(400).json({ message: 'Phản hồi tối đa 2.000 ký tự' });
     }
@@ -153,6 +156,9 @@ exports.updateReportStatus = async (req, res) => {
     const report = await Report.findById(id).populate('documentId', 'title');
     if (!report) {
       return res.status(404).json({ message: 'Không tìm thấy báo cáo' });
+    }
+    if (req.user.role === 'moderator' && report.status !== 'pending') {
+      return res.status(403).json({ message: 'Kiểm duyệt viên chỉ được xử lý báo cáo đang chờ' });
     }
 
     const previousStatus = report.status;

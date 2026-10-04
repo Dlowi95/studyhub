@@ -40,14 +40,14 @@ flowchart LR
 | --- | --- |
 | Khách | Tìm kiếm, xem tài liệu đã duyệt và xem đánh giá |
 | Người dùng | Đăng tải; theo dõi/xóa tài liệu của mình; đánh giá; báo cáo và xem phản hồi của mình |
-| Moderator | Xem hàng đợi; duyệt/từ chối tài liệu; xử lý báo cáo; xem thống kê quản trị |
-| Admin | Các quyền kiểm duyệt; thêm/sửa/xóa học phần; sửa/xóa tài liệu; xóa báo cáo và quản lý tài khoản |
+| Moderator | Chỉ xem hàng đợi đang chờ và báo cáo đang chờ; duyệt/từ chối tài liệu đang chờ, xử lý/bỏ qua báo cáo đang chờ. Không xem thống kê toàn hệ thống, danh sách tài khoản, nhật ký hoặc danh mục quản trị. |
+| Admin | Toàn bộ quyền kiểm duyệt; xem nhật ký và danh sách tài khoản; quản lý vai trò/trạng thái tài khoản, học phần, tài liệu và báo cáo; bật/tắt bảo trì website và nhận tài liệu mới. |
 
 ## 3. Kiến trúc hiện tại
 
 - **Frontend:** React 19, Vite, Tailwind CSS, Radix/shadcn, React Router.
 - **Backend:** Node.js, Express, JWT và Multer.
-- **Dữ liệu:** MongoDB/Mongoose; các collection chính `User`, `Document`, `Subject`, `Review`, `Report`, `Notification`.
+- **Dữ liệu:** MongoDB/Mongoose; các collection chính `User`, `Document`, `Subject`, `Review`, `Report`, `Notification`, `SystemSetting`.
 - **Tệp:** Cloudinary khi được cấu hình; MongoDB GridFS khi không có Cloudinary. Một số bản ghi cũ vẫn dùng thư mục `uploads` trên máy.
 - **Xem trước:** PDF/TXT trên trình duyệt; nội dung Office được trích xuất để xem. Bản xem trước Office không đảm bảo giữ nguyên mọi định dạng của tệp gốc.
 
@@ -117,3 +117,11 @@ npm run build
 - Đổi tên cập nhật `Document.subjectId` và `subjectName` trong cùng giao dịch MongoDB. Bản đánh dấu xóa ngăn học phần mặc định xuất hiện lại; ngừng sử dụng giữ tài liệu hiện có và chặn lựa chọn khi đăng mới. Môi trường MongoDB cần replica set hoặc sharded cluster; kết nối hiện tại đã được kiểm tra hỗ trợ giao dịch.
 - `frontend/src/components/Pagination.jsx` dùng chung cho học phần, kho tài liệu quản trị và thư viện. Truyền `page`, `total`, `pageSize`, `onPageChange`; có thể thêm `totalPages` cho API phân trang và `onPageSizeChange` để chọn số mục. Học phần mặc định 12 mục/trang, tùy chọn 24/48; nút Trước/Sau có mũi tên, số trang đang chọn nổi bật và có dấu ba chấm khi nhiều trang.
 - Kiểm tra: backend 32 bài, frontend 5 bài; lint/build đạt. Kiểm tra trình duyệt bằng API giả lập gồm thêm/sửa/xóa, lỗi trùng tên, bảo vệ học phần có tài liệu, lọc và đổi trang, phân quyền giao diện, font thực tế, màn hình 320–1440px. Các thao tác ghi trong kiểm tra trình duyệt chỉ thay đổi dữ liệu thử trong bộ nhớ.
+
+## 9. Phân quyền quản trị và trạng thái dịch vụ — 04/10/2026
+
+- Moderator chỉ đọc hàng đợi và báo cáo đang chờ; API không trả thống kê toàn hệ thống, danh sách người dùng, nhật ký, danh mục học phần hoặc tài liệu ngoài hàng đợi. Thao tác kiểm duyệt chỉ áp dụng tài liệu/báo cáo đang chờ.
+- Admin có quyền xem toàn bộ dữ liệu quản trị, quản lý tài khoản/danh mục/tài liệu và thay đổi cài đặt hệ thống.
+- Cài đặt hệ thống lưu trong MongoDB. Admin có thể bật bảo trì API công khai và đường dẫn tệp local `/uploads`, hoặc tạm dừng nhận tệp mới; đăng nhập, health check và API quản trị vẫn hoạt động. Trạng thái thay đổi có audit log; API kiểm tra trạng thái công khai có TTL cache tối đa 2 giây.
+- Trước khi phát hành, kiểm tra trên môi trường staging: admin bật/tắt từng công tắc; người dùng thường nhận màn bảo trì hoặc thông báo tạm ngưng tải; moderator không truy cập được dữ liệu/quyền admin; admin vẫn vào được trang quản trị trong lúc bảo trì.
+- Kiểm tra lần này: backend **48 bài**, frontend **7 bài**, ESLint và build production đều đạt.

@@ -16,10 +16,12 @@ const {
   getSearchSuggestions,
 } = require("../controllers/documentController");
 const { authenticateToken, optionalAuthenticateToken, authorizeRoles } = require("../middleware/auth");
+const { uploadsAvailability } = require("../middleware/systemAvailability");
 
 router.post(
   "/upload",
   authenticateToken,
+  uploadsAvailability,
   (req, res, next) => {
     upload.single("file")(req, res, (error) => {
       if (!error) return next();

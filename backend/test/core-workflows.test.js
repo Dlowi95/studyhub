@@ -126,6 +126,10 @@ test("public statistics never aggregate pending documents; admin can see all", a
   await documents.getDocumentStats({ user: { role: "admin" } }, response());
   assert.ok(matches.slice(0, 3).every((match) => !match.status));
   assert.equal(matches[3].status, "approved");
+  matches.length = 0;
+  await documents.getDocumentStats({ user: { role: "moderator" } }, response());
+  assert.ok(matches.slice(0, 3).every((match) => match.status === "pending"));
+  assert.equal(matches[3].status, "approved");
 });
 
 test("upload rejects whitespace title before storage; subject uses canonical catalog name", async (t) => {

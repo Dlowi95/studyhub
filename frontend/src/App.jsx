@@ -6,6 +6,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AuthModal from "./components/AuthModal";
 import UploadModal from "./components/UploadModal";
 import { Toaster } from "@/components/ui/toaster";
+import { BookOpen, Clock3, RefreshCw, Wrench } from "lucide-react";
 import { ThemeProvider } from "./context/ThemeContext";
 import SiteHeader from "./components/SiteHeader";
 import SiteFooter from "./components/SiteFooter";
@@ -41,12 +42,60 @@ function AuthRedirect({ tab = "login", onOpenAuth }) {
   return <Navigate to="/" replace />;
 }
 
+function MaintenanceScreen({ message, expectedEndAt, onLogin }) {
+  const expectedDate = expectedEndAt ? new Date(expectedEndAt) : null;
+  const hasExpectedDate = expectedDate && !Number.isNaN(expectedDate.getTime());
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10 text-foreground">
+      <section className="w-full max-w-2xl rounded-[2rem] border border-primary/25 bg-card p-7 text-center shadow-xl sm:p-12">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md">
+          <BookOpen size={31} />
+        </div>
+        <p className="mt-7 text-[11px] font-bold tracking-[0.22em] text-primary">STUDYHUB · THÔNG BÁO</p>
+        <div className="mx-auto mt-5 flex h-12 w-12 items-center justify-center rounded-full bg-warning/10 text-warning">
+          <Wrench size={23} />
+        </div>
+        <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl">StudyHub đang bảo trì</h1>
+        <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-muted-foreground">{message}</p>
+        {hasExpectedDate && <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-muted px-4 py-2 text-xs font-semibold text-foreground"><Clock3 size={15} /> Dự kiến mở lại {expectedDate.toLocaleString("vi-VN", { dateStyle: "medium", timeStyle: "short" })}</p>}
+        <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+          <button type="button" onClick={() => window.location.reload()} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:bg-primary/90">
+            <RefreshCw size={16} /> Kiểm tra lại
+          </button>
+          <button type="button" onClick={onLogin} className="h-11 rounded-xl border border-border bg-card px-5 text-sm font-semibold text-foreground transition hover:bg-muted">
+            Đăng nhập quản trị
+          </button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function UploadPausedPage({ message }) {
+  return (
+    <section className="mx-auto flex min-h-[50vh] max-w-3xl items-center justify-center px-4 py-12">
+      <div className="w-full rounded-3xl border border-warning/25 bg-card p-7 text-center shadow-sm sm:p-10">
+        <CloudUploadFallback />
+        <h1 className="mt-4 text-2xl font-extrabold text-foreground">Tạm ngưng nhận tài liệu</h1>
+        <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-muted-foreground">{message}</p>
+      </div>
+    </section>
+  );
+}
+
+function CloudUploadFallback() {
+  return <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-warning/10 text-warning"><Wrench size={25} /></div>;
+}
+
 function MainLayout() {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith("/admin");
 
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [systemStatus, setSystemStatus] = useState(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState("login");
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -55,6 +104,30 @@ function MainLayout() {
   // Notification State (Yêu cầu 4)
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const uploadsEnabled = systemStatus?.uploadsEnabled !== false;
+
+  useEffect(() => {
+    let active = true;
+    let requestInFlight = false;
+    const refreshSystemStatus = async () => {
+      if (requestInFlight) return;
+      requestInFlight = true;
+      try {
+        const response = await fetch(`${API_URL}/system/status`, { cache: "no-store" });
+        if (response.ok) {
+          const status = await response.json();
+          if (active) setSystemStatus(status);
+        }
+      } catch {
+        // A temporary status check failure should not block browsing when the API recovers.
+      } finally {
+        requestInFlight = false;
+      }
+    };
+    void refreshSystemStatus();
+    const timer = window.setInterval(refreshSystemStatus, 15000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, []);
 
   const fetchNotifications = useCallback(async (authToken) => {
     const currentToken = authToken || localStorage.getItem("token");
@@ -150,6 +223,7 @@ function MainLayout() {
       setNotifications([]);
       setUnreadCount(0);
     }
+    setAuthReady(true);
   }, [fetchNotifications]);
 
   useEffect(() => {
@@ -167,7 +241,7 @@ function MainLayout() {
     };
 
     const handleOpenUploadModal = () => {
-      setUploadModalOpen(true);
+      if (uploadsEnabled) setUploadModalOpen(true);
     };
 
     window.addEventListener("openAuthModal", handleOpenAuthModal);
@@ -180,7 +254,7 @@ function MainLayout() {
       window.removeEventListener("openAuthModal", handleOpenAuthModal);
       window.removeEventListener("openUploadModal", handleOpenUploadModal);
     };
-  }, [handleStorageChange]);
+  }, [handleStorageChange, uploadsEnabled]);
 
   useEffect(() => {
     if (!token) return undefined;
@@ -211,6 +285,7 @@ function MainLayout() {
   };
 
   const handleUploadClick = () => {
+    if (!uploadsEnabled) return;
     if (!token || !user) {
       openAuth("login");
     } else {
@@ -246,22 +321,37 @@ function MainLayout() {
     );
   }
 
+  if (authReady && systemStatus?.maintenanceEnabled && !["admin", "moderator"].includes(user?.role)) {
+    return (
+      <>
+        <MaintenanceScreen
+          message={systemStatus.maintenanceMessage}
+          expectedEndAt={systemStatus.maintenanceExpectedEndAt}
+          onLogin={() => openAuth("login")}
+        />
+        <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} initialTab={authModalTab} />
+        <Toaster />
+      </>
+    );
+  }
+
   return (
     <div className="studyhub-app">
       <a href="#main-content" className="skip-link">Bỏ qua menu, đến nội dung</a>
-      <SiteHeader user={user} token={token} onOpenAuth={openAuth} onUpload={handleUploadClick} onLogout={handleLogout}
+      <SiteHeader user={user} token={token} onOpenAuth={openAuth} onUpload={handleUploadClick} onLogout={handleLogout} uploadsEnabled={uploadsEnabled}
         notifications={notifications} unreadCount={unreadCount} onFetchNotifications={() => fetchNotifications(token)} onReadAll={handleMarkAllAsRead} onNotificationClick={handleNotificationClick} />
+      {!uploadsEnabled && <div role="status" className="mx-auto mt-3 w-[min(94%,1200px)] rounded-xl border border-warning/25 bg-warning/10 px-4 py-3 text-xs font-medium leading-relaxed text-warning">{systemStatus?.uploadsMessage || "Đang tạm ngưng nhận tài liệu mới. Bạn vẫn có thể xem và tải tài liệu hiện có."}</div>}
       <main id="main-content" className="site-content" tabIndex={-1}>
         <Suspense fallback={<PageLoadingFallback />}>
           <Routes>
-            <Route path="/" element={<Home onOpenAuth={openAuth} user={user} />} />
+            <Route path="/" element={<Home onOpenAuth={openAuth} user={user} uploadsEnabled={uploadsEnabled} />} />
             <Route path="/subjects" element={<SubjectDetailPage onOpenAuth={openAuth} user={user} />} />
             <Route path="/subjects/:subjectName" element={<SubjectDetailPage onOpenAuth={openAuth} user={user} />} />
             <Route path="/login" element={<AuthRedirect tab="login" onOpenAuth={openAuth} />} />
             <Route path="/register" element={<AuthRedirect tab="register" onOpenAuth={openAuth} />} />
             <Route path="/document/:id" element={<DocumentDetailPage />} />
             <Route path="/documents/:id" element={<DocumentDetailPage />} />
-            <Route path="/documents/upload" element={<ProtectedRoute><UploadDocument /></ProtectedRoute>} />
+            <Route path="/documents/upload" element={uploadsEnabled ? <ProtectedRoute><UploadDocument /></ProtectedRoute> : <UploadPausedPage message={systemStatus?.uploadsMessage || "Đang tạm ngưng nhận tài liệu mới."} />} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/my-reports" element={<ProtectedRoute><MyReports /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />

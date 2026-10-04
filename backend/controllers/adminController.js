@@ -36,10 +36,11 @@ exports.getAllUsers = async (req, res) => {
 exports.getAllDocuments = async (req, res) => {
   try {
     const { status } = req.query;
-    const query = status ? { status } : {};
+    // Moderators only need the active review queue; never expose the full catalog here.
+    const query = req.user?.role === "moderator" ? { status: "pending" } : (status ? { status } : {});
 
     const documents = await Document.find(query)
-      .populate("uploaderId", "name email")
+      .populate("uploaderId", req.user?.role === "moderator" ? "name" : "name email")
       .sort({ createdAt: -1 });
 
     const items = await Promise.all(
@@ -62,9 +63,9 @@ exports.getAllDocuments = async (req, res) => {
 
 exports.getDocumentById = async (req, res) => {
   try {
-    const document = await Document.findById(req.params.id).populate("uploaderId", "name email");
+    const document = await Document.findById(req.params.id).populate("uploaderId", req.user?.role === "moderator" ? "name" : "name email");
 
-    if (!document) {
+    if (!document || (req.user?.role === "moderator" && document.status !== "pending")) {
       return res.status(404).json({ message: "Tài liệu không tồn tại" });
     }
 
@@ -77,7 +78,7 @@ exports.getDocumentById = async (req, res) => {
 exports.previewDocument = async (req, res) => {
   try {
     const document = await Document.findById(req.params.id).lean();
-    if (!document) {
+    if (!document || (req.user?.role === "moderator" && document.status !== "pending")) {
       return res.status(404).json({ message: "Tài liệu không tồn tại" });
     }
 
@@ -254,6 +255,10 @@ exports.updateDocumentStatus = async (req, res) => {
 
     if (!document) {
       return res.status(404).json({ message: "Tài liệu không tồn tại" });
+    }
+
+    if (req.user?.role === "moderator" && (document.status !== "pending" || !["approved", "rejected"].includes(status))) {
+      return res.status(403).json({ message: "Kiểm duyệt viên chỉ được xử lý tài liệu đang chờ duyệt" });
     }
 
     if (status === "approved") {

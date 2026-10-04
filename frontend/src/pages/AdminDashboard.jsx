@@ -97,6 +97,9 @@ import {
   ShieldCheck,
   FileText,
   History,
+  Settings,
+  Wrench,
+  CloudUpload,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -172,6 +175,12 @@ function SidebarNav({
       icon: History,
       badge: null,
     },
+    {
+      id: "settings",
+      label: "Cài đặt hệ thống",
+      icon: Settings,
+      badge: null,
+    },
   ];
 
   return (
@@ -194,7 +203,7 @@ function SidebarNav({
 
         {/* Navigation Items */}
         <nav className="space-y-1 text-sm font-medium">
-          {navItems.map((item) => {
+          {navItems.filter((item) => !isModerator || ["pending", "reports"].includes(item.id)).map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (
@@ -322,9 +331,13 @@ const getDocumentExtension = (doc = {}) => {
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
-    return ["overview", "users", "documents", "subjects", "pending", "reports", "audit"].includes(requestedTab)
+    let role = "student";
+    try { role = JSON.parse(localStorage.getItem("user") || "null")?.role || role; } catch { /* Use the restricted default. */ }
+    const moderatorTabs = ["pending", "reports"];
+    const allTabs = [...moderatorTabs, "users", "documents", "subjects", "audit", "settings"];
+    return allTabs.includes(requestedTab) && (role !== "moderator" || moderatorTabs.includes(requestedTab))
       ? requestedTab
-      : "overview";
+      : role === "moderator" ? "pending" : "overview";
   });
   const [users, setUsers] = useState([]);
   const [allDocs, setAllDocs] = useState([]);
@@ -333,6 +346,18 @@ export default function AdminDashboard() {
   const [documentStats, setDocumentStats] = useState(null);
   const [reports, setReports] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [systemSettings, setSystemSettings] = useState({
+    maintenanceEnabled: false,
+    maintenanceMessage: "StudyHub đang được bảo trì để nâng cấp trải nghiệm. Vui lòng quay lại sau.",
+    maintenanceExpectedEndAt: null,
+    uploadsEnabled: true,
+    uploadsMessage: "StudyHub đang tạm dừng nhận tài liệu mới. Bạn vẫn có thể xem và tải tài liệu hiện có.",
+  });
+  const [settingsMessageDraft, setSettingsMessageDraft] = useState(systemSettings.maintenanceMessage);
+  const [settingsUploadsMessageDraft, setSettingsUploadsMessageDraft] = useState(systemSettings.uploadsMessage);
+  const [settingsEndAtDraft, setSettingsEndAtDraft] = useState("");
+  const [settingsReason, setSettingsReason] = useState("");
+  const [settingsSaving, setSettingsSaving] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [currentAdmin] = useState(() => {
@@ -420,6 +445,10 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const apiUrl = API_URL;
   const isModerator = currentAdmin?.role === "moderator";
+  const changeActiveTab = (tab) => {
+    if (isModerator && !["pending", "reports"].includes(tab)) return;
+    setActiveTab(tab);
+  };
 
   const fetchData = useCallback(async () => {
     dataAbortRef.current?.abort();
@@ -428,11 +457,21 @@ export default function AdminDashboard() {
     setLoading(true);
     setDataError("");
     try {
-      const resources = [
-        ["Tài liệu", "/admin/documents"], ["Người dùng", "/admin/users"],
-        ["Thống kê", "/admin/stats"], ["Học phần", "/admin/subjects"], ["Báo cáo", "/reports"], ["Nhật ký", "/admin/audit-logs"],
-      ];
-      const results = await Promise.allSettled(resources.map(async ([label, path]) => {
+      const resources = isModerator
+        ? [
+            { key: "documents", label: "Hàng đợi kiểm duyệt", path: "/admin/documents?status=pending" },
+            { key: "reports", label: "Báo cáo chờ xử lý", path: "/admin/reports?status=pending" },
+          ]
+        : [
+            { key: "documents", label: "Tài liệu", path: "/admin/documents" },
+            { key: "users", label: "Người dùng", path: "/admin/users" },
+            { key: "stats", label: "Thống kê", path: "/admin/stats" },
+            { key: "subjects", label: "Học phần", path: "/admin/subjects" },
+            { key: "reports", label: "Báo cáo", path: "/admin/reports" },
+            { key: "audit", label: "Nhật ký", path: "/admin/audit-logs" },
+            { key: "settings", label: "Cài đặt hệ thống", path: "/admin/system-settings" },
+          ];
+      const results = await Promise.allSettled(resources.map(async ({ label, path }) => {
         const res = await fetch(`${apiUrl}${path}`, { headers: getAuthHeaders(), signal: controller.signal });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
@@ -450,17 +489,20 @@ export default function AdminDashboard() {
         window.location.href = "/";
         return;
       }
-      if (results[0].status === "fulfilled") {
-        const docsList = Array.isArray(results[0].value) ? results[0].value : [];
+      const dataByKey = new Map(resources.map((resource, index) => [resource.key, results[index]]));
+      const documentsResult = dataByKey.get("documents");
+      if (documentsResult?.status === "fulfilled") {
+        const docsList = Array.isArray(documentsResult.value) ? documentsResult.value : [];
         setAllDocs(docsList);
         setPendingDocs(docsList.filter((d) => d.status === "pending"));
       }
-      if (results[1].status === "fulfilled") {
-        setUsers(Array.isArray(results[1].value) ? results[1].value : []);
-      }
-      if (results[2].status === "fulfilled") setDocumentStats(results[2].value);
-      if (results[3].status === "fulfilled") {
-        const subjectList = Array.isArray(results[3].value.subjects) ? results[3].value.subjects : [];
+      const usersResult = dataByKey.get("users");
+      setUsers(usersResult?.status === "fulfilled" && Array.isArray(usersResult.value) ? usersResult.value : []);
+      const statsResult = dataByKey.get("stats");
+      if (statsResult?.status === "fulfilled") setDocumentStats(statsResult.value);
+      const subjectsResult = dataByKey.get("subjects");
+      if (subjectsResult?.status === "fulfilled") {
+        const subjectList = Array.isArray(subjectsResult.value.subjects) ? subjectsResult.value.subjects : [];
         const maxCount = Math.max(...subjectList.map((subject) => subject.count || 0), 1);
         setSubjects(
           subjectList.map((subject) => ({
@@ -471,13 +513,23 @@ export default function AdminDashboard() {
         );
       }
 
-      if (results[4].status === "fulfilled") {
-        setReports(Array.isArray(results[4].value.reports) ? results[4].value.reports : []);
+      const reportsResult = dataByKey.get("reports");
+      if (reportsResult?.status === "fulfilled") {
+        setReports(Array.isArray(reportsResult.value.reports) ? reportsResult.value.reports : []);
       }
-      if (results[5].status === "fulfilled") {
-        setAuditLogs(Array.isArray(results[5].value.items) ? results[5].value.items : []);
+      const auditResult = dataByKey.get("audit");
+      setAuditLogs(auditResult?.status === "fulfilled" && Array.isArray(auditResult.value.items) ? auditResult.value.items : []);
+      const settingsResult = dataByKey.get("settings");
+      if (settingsResult?.status === "fulfilled") {
+        const nextSettings = settingsResult.value;
+        setSystemSettings(nextSettings);
+        setSettingsMessageDraft(nextSettings.maintenanceMessage || "");
+        setSettingsUploadsMessageDraft(nextSettings.uploadsMessage || "");
+        setSettingsEndAtDraft(nextSettings.maintenanceExpectedEndAt
+          ? new Date(new Date(nextSettings.maintenanceExpectedEndAt).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+          : "");
       }
-      const failures = results.flatMap((result, index) => result.status === "rejected" ? [result.reason.message || `${resources[index][0]}: Không tải được dữ liệu`] : []);
+      const failures = results.flatMap((result, index) => result.status === "rejected" ? [result.reason.message || `${resources[index].label}: Không tải được dữ liệu`] : []);
       setDataError(failures.length ? `Chưa cập nhật được đầy đủ dữ liệu. ${failures.join("; ")}` : "");
       if (!failures.length) setLastUpdated(new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }));
     } catch (e) {
@@ -485,7 +537,34 @@ export default function AdminDashboard() {
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
-  }, [apiUrl]);
+  }, [apiUrl, isModerator]);
+
+  const updateSystemSettings = async (updates) => {
+    if (isModerator || settingsSaving) return;
+    setSettingsSaving(true);
+    try {
+      const response = await fetch(`${apiUrl}/admin/system-settings`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ ...updates, reason: settingsReason.trim() }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Không thể lưu cài đặt hệ thống");
+      const savedSettings = data.settings;
+      setSystemSettings(savedSettings);
+      if (Object.hasOwn(updates, "maintenanceMessage")) setSettingsMessageDraft(savedSettings.maintenanceMessage || "");
+      if (Object.hasOwn(updates, "uploadsMessage")) setSettingsUploadsMessageDraft(savedSettings.uploadsMessage || "");
+      if (Object.hasOwn(updates, "maintenanceExpectedEndAt")) setSettingsEndAtDraft(savedSettings.maintenanceExpectedEndAt
+        ? new Date(new Date(savedSettings.maintenanceExpectedEndAt).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+        : "");
+      setSettingsReason("");
+      toast({ title: "Đã cập nhật cài đặt", description: data.message || "Thay đổi đã được ghi vào nhật ký hệ thống." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Không thể lưu cài đặt", description: error.message });
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
 
   useEffect(() => {
     const timerId = window.setTimeout(() => {
@@ -921,7 +1000,7 @@ export default function AdminDashboard() {
     const action = reportActionType;
 
     try {
-      const reportRes = await fetch(`${apiUrl}/reports/${report._id}/status`, {
+      const reportRes = await fetch(`${apiUrl}/admin/reports/${report._id}/status`, {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -971,7 +1050,7 @@ export default function AdminDashboard() {
 
   const confirmDeleteReport = async (reportId) => {
     try {
-      const res = await fetch(`${apiUrl}/reports/${reportId}`, {
+      const res = await fetch(`${apiUrl}/admin/reports/${reportId}`, {
         method: "DELETE",
         headers: getAuthHeaders(),
       });
@@ -1000,7 +1079,7 @@ export default function AdminDashboard() {
 
   const handleReopenReport = async (report) => {
     try {
-      const reportRes = await fetch(`${apiUrl}/reports/${report._id}/status`, {
+      const reportRes = await fetch(`${apiUrl}/admin/reports/${report._id}/status`, {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify({ status: "pending" }),
@@ -1037,6 +1116,7 @@ export default function AdminDashboard() {
     pending: "Kiểm duyệt tài liệu",
     reports: "Quản lý báo cáo vi phạm",
     audit: "Nhật ký kiểm duyệt",
+    settings: "Cài đặt hệ thống",
   };
 
   const handleConfirmDelete = async () => {
@@ -1125,7 +1205,7 @@ export default function AdminDashboard() {
       <aside className="hidden lg:flex w-64 bg-card border-r border-border/70 flex-col shrink-0 sticky top-0 h-screen z-40">
         <SidebarNav
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={changeActiveTab}
           usersCount={users.length}
           docsCount={allDocs.length}
           subjectsCount={subjects.length}
@@ -1147,7 +1227,7 @@ export default function AdminDashboard() {
           <aside className="relative w-72 max-w-[85vw] bg-card border-r border-border/70 flex flex-col h-full z-50 shadow-2xl animate-in slide-in-from-left duration-200">
             <SidebarNav
               activeTab={activeTab}
-              setActiveTab={setActiveTab}
+              setActiveTab={changeActiveTab}
               usersCount={users.length}
               docsCount={allDocs.length}
               subjectsCount={subjects.length}
@@ -1192,7 +1272,7 @@ export default function AdminDashboard() {
               }`}
             >
               <ShieldCheck className="w-3 h-3 mr-1" />
-              {isModerator ? "Moderator" : "Quản trị viên"}
+              {isModerator ? "Kiểm duyệt viên" : "Quản trị viên"}
             </Badge>
           </div>
 
@@ -1235,7 +1315,7 @@ export default function AdminDashboard() {
 
         {/* Dashboard Main Content */}
         <main className="p-4 sm:p-6 space-y-6 flex-1 text-left">
-          <PageHeading eyebrow="STUDYHUB / QUẢN TRỊ" title={tabTitles[activeTab]} description="Tài liệu, học phần và phản hồi — mọi việc cần xử lý ở cùng một nơi." />
+          <PageHeading eyebrow={isModerator ? "STUDYHUB / KIỂM DUYỆT" : "STUDYHUB / QUẢN TRỊ"} title={tabTitles[activeTab]} description={isModerator ? "Xử lý tài liệu và báo cáo đang chờ xét duyệt." : "Tài liệu, học phần và phản hồi — mọi việc cần xử lý ở cùng một nơi."} />
           {dataError && (
             <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-warning/25 bg-warning/10 p-4 text-xs text-warning sm:flex-row sm:items-center sm:justify-between">
               <p>{dataError}</p>
@@ -1244,14 +1324,14 @@ export default function AdminDashboard() {
           )}
           {loading && <p role="status" className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Đang cập nhật dữ liệu quản trị…</p>}
           {!loading && activeTab === "overview" && (
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className={`grid gap-3 ${isModerator ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
               {[
                 { label: "Tài liệu cần duyệt", count: pendingDocs.length, tab: "pending", tone: "text-warning" },
                 { label: "Báo cáo cần xử lý", count: pendingReportsCount, tab: "reports", tone: "text-destructive" },
                 { label: "Tài liệu thiếu tệp", count: missingFilesCount, tab: "documents", tone: "text-destructive" },
-              ].map((item) => (
+              ].filter((item) => !isModerator || item.tab !== "documents").map((item) => (
                 <button key={item.tab} type="button" onClick={() => {
-                  setActiveTab(item.tab);
+                  changeActiveTab(item.tab);
                   if (item.tab === "documents") { setDocSourceFilter("missing"); setDocFilterStatus("all"); setDocSubjectFilter("all"); setSearchQuery(""); setDocumentPage({ key: "", page: 1 }); }
                 }} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card/60 p-4 text-left transition hover:border-primary/40">
                   <span className="text-xs font-semibold text-muted-foreground">{item.label}</span><strong className={`text-2xl ${item.tone}`}>{item.count}</strong>
@@ -1263,9 +1343,9 @@ export default function AdminDashboard() {
           {activeTab === "overview" && (
             <div className="space-y-6">
               {/* 4 Primary Stat Cards Row */}
-              <div className="admin-stat-grid grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className={`admin-stat-grid grid grid-cols-2 ${isModerator ? "lg:grid-cols-2" : "lg:grid-cols-4"} gap-4`}>
                 {/* Stat 1: Người dùng */}
-                <Card className="bg-card border-border/80 text-foreground rounded-2xl shadow-xs">
+                {!isModerator && <Card className="bg-card border-border/80 text-foreground rounded-2xl shadow-xs">
                   <CardContent className="p-5 space-y-2.5">
                     <div className="flex items-center justify-between text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
                       <span>NGƯỜI DÙNG</span>
@@ -1279,10 +1359,10 @@ export default function AdminDashboard() {
                       <span>+{recentUsersCount} thành viên trong 30 ngày</span>
                     </div>
                   </CardContent>
-                </Card>
+                </Card>}
 
                 {/* Stat 2: Tài liệu công khai */}
-                <Card className="bg-card border-border/80 text-foreground rounded-2xl shadow-xs">
+                {!isModerator && <Card className="bg-card border-border/80 text-foreground rounded-2xl shadow-xs">
                   <CardContent className="p-5 space-y-2.5">
                     <div className="flex items-center justify-between text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
                       <span>TÀI LIỆU CÔNG KHAI</span>
@@ -1296,7 +1376,7 @@ export default function AdminDashboard() {
                       <span>{documentStats?.summary?.totalDownloads || 0} lượt tải tổng cộng</span>
                     </div>
                   </CardContent>
-                </Card>
+                </Card>}
 
                 {/* Stat 3: Việc chờ xử lý */}
                 <Card className="bg-card border-border/80 text-foreground rounded-2xl shadow-xs">
@@ -1539,7 +1619,7 @@ export default function AdminDashboard() {
                     </div>
 
                     <button
-                      onClick={() => setActiveTab("reports")}
+                      onClick={() => changeActiveTab("reports")}
                       className="w-full py-2 text-center text-xs font-semibold text-primary hover:text-primary hover:underline cursor-pointer"
                     >
                       Mở bảng quản lý báo cáo chi tiết →
@@ -1555,7 +1635,7 @@ export default function AdminDashboard() {
                       <CardDescription className="text-xs text-muted-foreground">Môn học có nhiều tài liệu nhất</CardDescription>
                     </div>
                     <button
-                      onClick={() => setActiveTab("subjects")}
+                      onClick={() => changeActiveTab("subjects")}
                       className="text-xs font-semibold text-primary hover:underline cursor-pointer"
                     >
                       Xem tất cả
@@ -1605,7 +1685,7 @@ export default function AdminDashboard() {
                     </CardDescription>
                   </div>
                   <button
-                    onClick={() => setActiveTab("pending")}
+                    onClick={() => changeActiveTab("pending")}
                     className="text-xs font-semibold text-primary hover:text-primary transition-colors cursor-pointer"
                   >
                     Xem tất cả ({pendingDocs.length}) →
@@ -2479,13 +2559,15 @@ export default function AdminDashboard() {
                       </TableHeader>
                       <TableBody>
                         {auditLogs.map((log) => {
-                          const title = log.metadata?.title || log.metadata?.documentTitle || "Tài liệu / báo cáo";
-                          const actionLabel = ({ document_status_changed: "Đổi trạng thái tài liệu", report_status_changed: "Xử lý báo cáo", subject_updated: "Cập nhật học phần", subject_deleted: "Xóa học phần" })[log.action] || log.action;
+                          const title = log.metadata?.title || log.metadata?.documentTitle || (log.entityType === "SystemSetting" ? "Cài đặt hệ thống" : "Tài liệu / báo cáo");
+                          const actionLabel = ({ document_status_changed: "Đổi trạng thái tài liệu", report_status_changed: "Xử lý báo cáo", subject_updated: "Cập nhật học phần", subject_deleted: "Xóa học phần", system_settings_updated: "Cập nhật cài đặt hệ thống" })[log.action] || log.action;
+                          const settingFieldLabels = { maintenanceEnabled: "Bảo trì website", maintenanceMessage: "Thông báo bảo trì", maintenanceExpectedEndAt: "Thời gian mở lại", uploadsEnabled: "Nhận tài liệu mới", uploadsMessage: "Thông báo tải lên" };
+                          const changeSummary = log.action === "system_settings_updated" ? (log.metadata?.changedFields || []).map((field) => settingFieldLabels[field] || field).join(", ") : `${log.previousStatus || "—"} → ${log.nextStatus || "—"}`;
                           return (
                             <TableRow key={log._id} className="border-border/60 hover:bg-card/40">
                               <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(log.createdAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}</TableCell>
                               <TableCell className="text-xs"><strong className="text-foreground">{log.actorId?.name || log.actorName || "Hệ thống"}</strong><span className="block text-[10px] text-muted-foreground">{log.actorRole || log.actorId?.role || ""}</span></TableCell>
-                              <TableCell className="text-xs"><span className="font-semibold text-foreground">{actionLabel}</span><span className="block text-[10px] text-muted-foreground">{log.previousStatus || "—"} → {log.nextStatus || "—"}</span></TableCell>
+                              <TableCell className="text-xs"><span className="font-semibold text-foreground">{actionLabel}</span><span className="block text-[10px] text-muted-foreground">{changeSummary}</span></TableCell>
                               <TableCell className="text-xs text-foreground max-w-[220px] truncate" title={title}>{title}</TableCell>
                               <TableCell className="text-xs text-muted-foreground max-w-[280px] truncate" title={log.reason || ""}>{log.reason || "Không có ghi chú"}</TableCell>
                             </TableRow>
@@ -2497,6 +2579,93 @@ export default function AdminDashboard() {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {activeTab === "settings" && !isModerator && (
+            <div className="space-y-5">
+              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm leading-relaxed text-muted-foreground">
+                Chỉ quản trị viên mới có thể thay đổi trạng thái dịch vụ. Mọi thay đổi sẽ được ghi vào nhật ký quản trị.
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                <Card className="bg-card border-border/80 text-foreground rounded-2xl shadow-xs">
+                  <CardHeader className="border-b border-border/70 p-5">
+                    <CardTitle className="flex items-center gap-2 text-base"><Wrench className="h-4 w-4 text-warning" /> Bảo trì website</CardTitle>
+                    <CardDescription className="text-xs leading-relaxed">Ẩn các chức năng công khai tạm thời. Đăng nhập, kiểm tra tình trạng và trang quản trị vẫn hoạt động để có thể tắt bảo trì.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4 p-5">
+                    <label className="flex items-center justify-between gap-4 rounded-xl border border-border/80 bg-muted/30 p-4">
+                      <span><strong className="block text-sm">{systemSettings.maintenanceEnabled ? "Đang bật bảo trì" : "Website đang hoạt động"}</strong><span className="mt-1 block text-xs text-muted-foreground">Có hiệu lực trên API công khai.</span></span>
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        aria-label="Bật chế độ bảo trì website"
+                        checked={systemSettings.maintenanceEnabled}
+                        disabled={settingsSaving}
+                        onChange={(event) => void updateSystemSettings({ maintenanceEnabled: event.target.checked })}
+                        className="h-5 w-9 shrink-0 cursor-pointer accent-primary disabled:cursor-wait"
+                      />
+                    </label>
+                    {systemSettings.maintenanceEnabled && <p className="rounded-xl border border-warning/25 bg-warning/10 p-3 text-xs leading-relaxed text-warning">Khách truy cập sẽ nhận trang bảo trì. Tài khoản admin và moderator vẫn có thể vào trang quản trị.</p>}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="maintenance-message" className="text-xs font-semibold text-muted-foreground">Thông báo hiển thị</Label>
+                      <Input id="maintenance-message" maxLength={500} disabled={settingsSaving} value={settingsMessageDraft} onChange={(event) => setSettingsMessageDraft(event.target.value)} className="bg-card text-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="maintenance-end-at" className="text-xs font-semibold text-muted-foreground">Dự kiến mở lại (không bắt buộc)</Label>
+                      <Input id="maintenance-end-at" type="datetime-local" disabled={settingsSaving} value={settingsEndAtDraft} onChange={(event) => setSettingsEndAtDraft(event.target.value)} className="bg-card text-sm" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-card border-border/80 text-foreground rounded-2xl shadow-xs">
+                  <CardHeader className="border-b border-border/70 p-5">
+                    <CardTitle className="flex items-center gap-2 text-base"><CloudUpload className="h-4 w-4 text-primary" /> Nhận tài liệu mới</CardTitle>
+                    <CardDescription className="text-xs leading-relaxed">Tắt đăng tải khi cần xử lý hàng đợi hoặc khắc phục lỗi tải tệp. Thư viện vẫn xem và tải tài liệu bình thường.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4 p-5">
+                    <label className="flex items-center justify-between gap-4 rounded-xl border border-border/80 bg-muted/30 p-4">
+                      <span><strong className="block text-sm">{systemSettings.uploadsEnabled ? "Đang nhận tài liệu" : "Đang tạm ngưng nhận tài liệu"}</strong><span className="mt-1 block text-xs text-muted-foreground">Ngăn cả thao tác tải tệp qua API.</span></span>
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        aria-label="Cho phép tải tài liệu mới lên"
+                        checked={systemSettings.uploadsEnabled}
+                        disabled={settingsSaving}
+                        onChange={(event) => void updateSystemSettings({ uploadsEnabled: event.target.checked })}
+                        className="h-5 w-9 shrink-0 cursor-pointer accent-primary disabled:cursor-wait"
+                      />
+                    </label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="uploads-message" className="text-xs font-semibold text-muted-foreground">Thông báo khi tạm ngưng</Label>
+                      <Input id="uploads-message" maxLength={300} disabled={settingsSaving} value={settingsUploadsMessageDraft} onChange={(event) => setSettingsUploadsMessageDraft(event.target.value)} className="bg-card text-sm" />
+                    </div>
+                    <p className="rounded-xl border border-border/70 bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">Trạng thái hiện tại: {systemSettings.uploadsEnabled ? "đang mở đăng tải" : "đang tạm dừng đăng tải"}.</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card className="bg-card border-border/80 text-foreground rounded-2xl shadow-xs">
+                <CardContent className="grid gap-3 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="settings-reason" className="text-xs font-semibold text-muted-foreground">Lý do ghi vào nhật ký (không bắt buộc)</Label>
+                    <Input id="settings-reason" maxLength={500} disabled={settingsSaving} value={settingsReason} onChange={(event) => setSettingsReason(event.target.value)} placeholder="Ví dụ: Bảo trì máy chủ cơ sở dữ liệu" className="bg-card text-sm" />
+                  </div>
+                  <Button
+                    type="button"
+                    disabled={settingsSaving || !settingsMessageDraft.trim() || !settingsUploadsMessageDraft.trim()}
+                    onClick={() => void updateSystemSettings({
+                      maintenanceMessage: settingsMessageDraft.trim(),
+                      maintenanceExpectedEndAt: settingsEndAtDraft ? new Date(settingsEndAtDraft).toISOString() : null,
+                      uploadsMessage: settingsUploadsMessageDraft.trim(),
+                    })}
+                    className="min-w-40 bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    {settingsSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Đang lưu</> : <><Check className="mr-2 h-4 w-4" />Lưu thông báo</>}
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </main>
       </div>

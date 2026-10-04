@@ -17,6 +17,8 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const followRoutes = require("./routes/followRoutes");
 const fileRoutes = require("./routes/fileRoutes");
 const bookmarkRoutes = require("./routes/bookmarkRoutes");
+const systemRoutes = require("./routes/systemRoutes");
+const { maintenanceMode } = require("./middleware/systemAvailability");
 const { createCorsOriginValidator, parseCorsOrigins } = require("./utils/corsOrigin");
 
 const app = express();
@@ -39,6 +41,7 @@ app.use(cors({
 app.use(express.json());
 app.use(
   "/uploads",
+  maintenanceMode,
   express.static(path.join(__dirname, "uploads"), {
     setHeaders: (res) => {
       res.setHeader("X-Content-Type-Options", "nosniff");
@@ -58,6 +61,10 @@ app.get("/api/health", (req, res) => {
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/system", systemRoutes);
+
+// Keep authentication, health checks, and the admin control plane reachable during maintenance.
+app.use("/api", maintenanceMode);
 
 app.use("/api/documents", documentRoutes);
 app.use("/api/subjects", subjectRoutes);
