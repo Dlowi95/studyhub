@@ -1,8 +1,11 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const Document = require("../models/Document");
+const DocumentDownload = require("../models/DocumentDownload");
+const DocumentInteraction = require("../models/DocumentInteraction");
 const Report = require("../models/report");
 const Review = require("../models/review");
+const ReviewReply = require("../models/ReviewReply");
 const Notification = require("../models/Notification");
 const Subject = require("../models/Subject");
 const documents = require("../controllers/documentController");
@@ -35,28 +38,74 @@ test("public search stays approved, handles accents/literal input, and bounds pa
 });
 
 test("list applies server search before pagination and uses one filter for total", async (t) => {
-  let findFilter;
-  let countFilter;
-  const chain = {
-    sort(value) { assert.equal(value.avgRating, -1); return this; },
-    skip(value) { assert.equal(value, 12); return this; },
-    limit(value) { assert.equal(value, 12); return this; },
-    populate() { return Promise.resolve([]); },
-  };
-  t.mock.method(Document, "find", (filter) => { findFilter = filter; return chain; });
-  t.mock.method(Document, "countDocuments", async (filter) => { countFilter = filter; return 25; });
+  let itemPipeline;
+  let countPipeline;
+  t.mock.method(Document, "aggregate", async (pipeline) => {
+    if (pipeline.some((stage) => stage.$count)) { countPipeline = pipeline; return [{ total: 25 }]; }
+    itemPipeline = pipeline;
+    return [];
+  });
   const res = response();
   await documents.getDocuments({ query: { q: "bai tap", page: "2", limit: "12", sort: "rating" } }, res);
   assert.equal(res.statusCode, 200);
-  assert.equal(findFilter.status, "approved");
-  assert.equal(findFilter.$and.length, 2);
-  assert.deepEqual(findFilter, countFilter);
+  const itemFilter = itemPipeline.find((stage) => stage.$match).$match;
+  const countFilter = countPipeline.find((stage) => stage.$match).$match;
+  assert.equal(itemFilter.status, "approved");
+  assert.equal(itemFilter.$and.length, 2);
+  assert.deepEqual(itemFilter, countFilter);
+  assert.ok(itemPipeline.some((stage) => stage.$skip === 12));
+  assert.ok(itemPipeline.some((stage) => stage.$limit === 12));
   assert.equal(res.body.total, 25);
   assert.equal(res.body.totalPages, 3);
 });
 
+test("my documents filters before pagination and returns full-account statistics", async (t) => {
+  let countFilter;
+  let listFilter;
+  let skipValue;
+  t.mock.method(Document, "countDocuments", async (filter) => { countFilter = filter; return 23; });
+  t.mock.method(Document, "aggregate", async (pipeline) => {
+    assert.equal(String(pipeline[0].$match.uploaderId), id);
+    return [{ total: 26, approved: 20, pending: 4, rejected: 2, totalViews: 91, totalDownloads: 37 }];
+  });
+  t.mock.method(Document, "find", (filter) => {
+    listFilter = filter;
+    return {
+      sort() { return this; },
+      skip(value) { skipValue = value; return this; },
+      limit() { return this; },
+      lean: async () => [{ _id: id, title: "Bài tập" }],
+    };
+  });
+
+  const res = response();
+  await documents.getMyDocuments({
+    user: { _id: id },
+    query: { q: "giai tich", status: "pending", page: "2", limit: "10" },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(listFilter, countFilter);
+  assert.equal(listFilter.uploaderId, id);
+  assert.equal(listFilter.status, "pending");
+  assert.equal(listFilter.$and.length, 2);
+  assert.equal(skipValue, 10);
+  assert.equal(res.body.count, 23);
+  assert.equal(res.body.page, 2);
+  assert.equal(res.body.totalPages, 3);
+  assert.equal(res.body.summary.total, 26);
+  assert.equal(res.body.summary.totalDownloads, 37);
+});
+
+test("my documents rejects unsupported status filters", async () => {
+  const res = response();
+  await documents.getMyDocuments({ user: { _id: id }, query: { status: "private" } }, res);
+  assert.equal(res.statusCode, 400);
+});
+
 test("pending documents cannot be opened through public detail or counters", async (t) => {
   t.mock.method(Document, "findById", () => ({ populate: async () => ({ status: "pending" }) }));
+  t.mock.method(Document, "findOne", async () => null);
   t.mock.method(Document, "findOneAndUpdate", async (filter) => {
     assert.deepEqual(filter, { _id: id, status: "approved" }); return null;
   });
@@ -75,7 +124,8 @@ test("public statistics never aggregate pending documents; admin can see all", a
   assert.ok(matches.every((match) => match.status === "approved"));
   matches.length = 0;
   await documents.getDocumentStats({ user: { role: "admin" } }, response());
-  assert.ok(matches.every((match) => !match.status));
+  assert.ok(matches.slice(0, 3).every((match) => !match.status));
+  assert.equal(matches[3].status, "approved");
 });
 
 test("upload rejects whitespace title before storage; subject uses canonical catalog name", async (t) => {
@@ -135,8 +185,12 @@ test("resolve and delete keeps report history and sends feedback after deleting 
     assert.deepEqual(update.$set, { documentTitle: "Bài tập", documentId: null }); preserved = true;
   });
   t.mock.method(Review, "deleteMany", async () => ({}));
+  t.mock.method(Review, "find", () => ({ select: async () => [] }));
+  t.mock.method(ReviewReply, "deleteMany", async () => ({}));
   t.mock.method(Notification, "deleteMany", async (filter) => { assert.equal(filter.relatedReportId, null); });
   t.mock.method(Notification, "updateMany", async () => ({}));
+  t.mock.method(DocumentDownload, "deleteMany", async () => ({}));
+  t.mock.method(DocumentInteraction, "deleteMany", async () => ({}));
   t.mock.method(Document, "findByIdAndDelete", async () => { deleted = true; });
   t.mock.method(Notification, "findOneAndUpdate", async (_filter, update) => { notification = update.$set; });
   const res = response();

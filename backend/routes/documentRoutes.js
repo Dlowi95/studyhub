@@ -5,6 +5,7 @@ const {
   uploadDocument,
   getDocuments,
   getDocumentById,
+  getDocumentVariants,
   getDocumentStats,
   getMyDocuments,
   deleteMyDocument,
@@ -14,7 +15,7 @@ const {
   previewDocument,
   getSearchSuggestions,
 } = require("../controllers/documentController");
-const { authenticateToken, authorizeRoles } = require("../middleware/auth");
+const { authenticateToken, optionalAuthenticateToken, authorizeRoles } = require("../middleware/auth");
 
 router.post(
   "/upload",
@@ -36,12 +37,13 @@ router.get("/stats", getDocumentStats);
 router.get("/my", authenticateToken, getMyDocuments);
 router.get("/suggestions", getSearchSuggestions);
 router.get("/", getDocuments);
+router.get("/:id/variants", getDocumentVariants);
 router.get("/:id/preview", previewDocument);
 router.get("/:id", getDocumentById);
 
 // public endpoints to increment counters
-router.post("/:id/view", incrementView);
-router.post("/:id/download", incrementDownload);
+router.post("/:id/view", optionalAuthenticateToken, incrementView);
+router.post("/:id/download", optionalAuthenticateToken, incrementDownload);
 
 router.delete("/:id", authenticateToken, deleteMyDocument);
 

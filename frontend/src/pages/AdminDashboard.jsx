@@ -1,6 +1,8 @@
+import { API_URL } from "@/lib/api";
 import { clearAccountSession } from "@/lib/session";
 import BrandMark from "@/components/BrandMark";
 import PageHeading from "@/components/PageHeading";
+import Pagination from "@/components/Pagination";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -90,6 +92,7 @@ import {
   BarChart3,
   RotateCcw,
   Plus,
+  Pencil,
   Loader2,
   ShieldCheck,
   FileText,
@@ -99,6 +102,13 @@ import { useToast } from "@/hooks/use-toast";
 
 const normalizeSearch = (value = "") => String(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/gi, "d").toLowerCase();
 const matchesSearch = (values, query) => normalizeSearch(values.filter(Boolean).join(" ")).includes(normalizeSearch(query.trim()));
+const nextSubjectCode = (subjects) => {
+  const maxNumber = subjects.reduce((max, subject) => {
+    const match = /^IT(\d+)$/i.exec(subject.code || "");
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+  return `IT${String(maxNumber + 1).padStart(3, "0")}`;
+};
 
 // Reusable Sidebar Content Component for Desktop and Mobile Drawer
 function SidebarNav({
@@ -183,7 +193,7 @@ function SidebarNav({
         <Separator className="bg-muted/60" />
 
         {/* Navigation Items */}
-        <nav className="space-y-1 text-xs font-medium">
+        <nav className="space-y-1 text-sm font-medium">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -341,10 +351,14 @@ export default function AdminDashboard() {
   const [docSubjectFilter, setDocSubjectFilter] = useState("all");
   const [docSourceFilter, setDocSourceFilter] = useState("all");
   const [subjectSearch, setSubjectSearch] = useState("");
+  const [subjectStatusFilter, setSubjectStatusFilter] = useState("all");
+  const subjectPageSize = 12;
+  const [subjectPage, setSubjectPage] = useState({ key: "", page: 1 });
   const [pendingSearch, setPendingSearch] = useState("");
   const [reportSearch, setReportSearch] = useState("");
   const [documentPage, setDocumentPage] = useState({ key: "", page: 1 });
   const [mutationKey, setMutationKey] = useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = useState(null);
   const mutationRef = useRef(false);
   const dataAbortRef = useRef(null);
 
@@ -396,10 +410,15 @@ export default function AdminDashboard() {
   const [newSubjectCode, setNewSubjectCode] = useState("");
   const [subjectSaving, setSubjectSaving] = useState(false);
   const [subjectError, setSubjectError] = useState("");
+  const [editingSubject, setEditingSubject] = useState(null);
+  const [subjectActive, setSubjectActive] = useState(true);
+  const [deletingSubject, setDeletingSubject] = useState(null);
+  const [subjectDeleteError, setSubjectDeleteError] = useState("");
+  const subjectMutationRef = useRef(false);
 
   const { toast } = useToast();
   const navigate = useNavigate();
-  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const apiUrl = API_URL;
   const isModerator = currentAdmin?.role === "moderator";
 
   const fetchData = useCallback(async () => {
@@ -559,7 +578,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteDoc = async (docId) => {
+  const handleDeleteDoc = (docId, title = "tài liệu này") => {
     if (isModerator) {
       toast({
         variant: "destructive",
@@ -568,7 +587,10 @@ export default function AdminDashboard() {
       });
       return;
     }
-    if (!window.confirm("Bạn có chắc chắn muốn xóa tài liệu này vĩnh viễn khỏi hệ thống?")) return;
+    setDeleteConfirmation({ type: "document", id: docId, title });
+  };
+
+  const confirmDeleteDocument = async (docId) => {
     try {
       const res = await fetch(`${apiUrl}/admin/documents/${docId}`, {
         method: "DELETE",
@@ -689,41 +711,69 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleOpenSubjectModal = () => {
-    setNewSubjectName("");
-    setNewSubjectCode("");
+  const handleOpenSubjectModal = (subject = null) => {
+    setEditingSubject(subject);
+    setNewSubjectName(subject?.name || "");
+    setNewSubjectCode(subject?.code || (subject ? "" : nextSubjectCode(subjects)));
+    setSubjectActive(subject?.active !== false);
     setSubjectError("");
     setSubjectModalOpen(true);
   };
 
   const handleCreateSubject = async (event) => {
     event.preventDefault();
+    if (subjectMutationRef.current || isModerator) return;
     const name = newSubjectName.trim();
     if (name.length < 2) {
       setSubjectError("Tên học phần phải có ít nhất 2 ký tự.");
       return;
     }
 
+    subjectMutationRef.current = true;
     setSubjectSaving(true);
     setSubjectError("");
     try {
-      const response = await fetch(`${apiUrl}/admin/subjects`, {
-        method: "POST",
+      const response = await fetch(`${apiUrl}/admin/subjects${editingSubject ? `/${encodeURIComponent(editingSubject.id || editingSubject._id)}` : ""}`, {
+        method: editingSubject ? "PUT" : "POST",
         headers: getAuthHeaders(),
-        body: JSON.stringify({ name, code: newSubjectCode.trim() }),
+        body: JSON.stringify({ name, code: newSubjectCode.trim(), active: subjectActive }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data.message || "Không thể thêm học phần");
+        throw new Error(data.message || "Không thể lưu học phần");
       }
 
       setSubjectModalOpen(false);
       setNewSubjectName("");
       setNewSubjectCode("");
+      toast({ title: editingSubject ? "Đã cập nhật học phần" : "Đã thêm học phần" });
       await fetchData();
     } catch (error) {
-      setSubjectError(error.message || "Không thể thêm học phần");
+      setSubjectError(error.message || "Không thể lưu học phần");
     } finally {
+      subjectMutationRef.current = false;
+      setSubjectSaving(false);
+    }
+  };
+
+  const handleDeleteSubject = async () => {
+    if (!deletingSubject || subjectMutationRef.current || isModerator) return;
+    subjectMutationRef.current = true;
+    setSubjectSaving(true);
+    setSubjectDeleteError("");
+    try {
+      const response = await fetch(`${apiUrl}/admin/subjects/${encodeURIComponent(deletingSubject.id || deletingSubject._id)}`, {
+        method: "DELETE", headers: getAuthHeaders(),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Không thể xóa học phần");
+      setDeletingSubject(null);
+      toast({ title: "Đã xóa học phần khỏi danh mục" });
+      await fetchData();
+    } catch (error) {
+      setSubjectDeleteError(error.message);
+    } finally {
+      subjectMutationRef.current = false;
       setSubjectSaving(false);
     }
   };
@@ -907,7 +957,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteReport = async (reportId) => {
+  const handleDeleteReport = (reportId) => {
     if (isModerator) {
       toast({
         variant: "destructive",
@@ -916,7 +966,10 @@ export default function AdminDashboard() {
       });
       return;
     }
-    if (!window.confirm("Bạn có chắc chắn muốn xóa bản ghi báo cáo này?")) return;
+    setDeleteConfirmation({ type: "report", id: reportId });
+  };
+
+  const confirmDeleteReport = async (reportId) => {
     try {
       const res = await fetch(`${apiUrl}/reports/${reportId}`, {
         method: "DELETE",
@@ -986,6 +1039,14 @@ export default function AdminDashboard() {
     audit: "Nhật ký kiểm duyệt",
   };
 
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmation) return;
+    const action = deleteConfirmation;
+    setDeleteConfirmation(null);
+    if (action.type === "document") await confirmDeleteDocument(action.id);
+    else await confirmDeleteReport(action.id);
+  };
+
   // --- Statistics & Chart Computations (Yêu cầu 1) ---
   const approvedDocsCount = documentStats?.summary?.approved ?? allDocs.filter((d) => d.status === "approved").length;
   const rejectedDocsCount = allDocs.filter((d) => d.status === "rejected").length;
@@ -1029,7 +1090,12 @@ export default function AdminDashboard() {
   const documentPages = Math.max(1, Math.ceil(filteredDocs.length / 20));
   const currentDocumentPage = Math.min(documentPages, documentPage.key === documentPageKey ? documentPage.page : 1);
   const visibleDocs = filteredDocs.slice((currentDocumentPage - 1) * 20, currentDocumentPage * 20);
-  const filteredSubjects = subjects.filter((subject) => matchesSearch([subject.name, subject.code], subjectSearch));
+  const filteredSubjects = subjects.filter((subject) => matchesSearch([subject.name, subject.code], subjectSearch)
+    && (subjectStatusFilter === "all" || (subjectStatusFilter === "active" ? subject.active !== false : subject.active === false)));
+  const subjectPageKey = JSON.stringify([subjectSearch, subjectStatusFilter]);
+  const subjectPages = Math.max(1, Math.ceil(filteredSubjects.length / subjectPageSize));
+  const currentSubjectPage = Math.min(subjectPages, subjectPage.key === subjectPageKey ? subjectPage.page : 1);
+  const visibleSubjects = filteredSubjects.slice((currentSubjectPage - 1) * subjectPageSize, currentSubjectPage * subjectPageSize);
   const filteredPending = pendingDocs.filter((doc) => matchesSearch([doc.title, doc.subjectName, doc.uploaderId?.name], pendingSearch));
   const filteredReports = reports.filter((report) =>
     (reportFilter === "all" || report.status === reportFilter) &&
@@ -1186,7 +1252,7 @@ export default function AdminDashboard() {
               ].map((item) => (
                 <button key={item.tab} type="button" onClick={() => {
                   setActiveTab(item.tab);
-                  if (item.tab === "documents") { setDocSourceFilter("missing"); setDocFilterStatus("all"); setDocSubjectFilter("all"); setSearchQuery(""); }
+                  if (item.tab === "documents") { setDocSourceFilter("missing"); setDocFilterStatus("all"); setDocSubjectFilter("all"); setSearchQuery(""); setDocumentPage({ key: "", page: 1 }); }
                 }} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card/60 p-4 text-left transition hover:border-primary/40">
                   <span className="text-xs font-semibold text-muted-foreground">{item.label}</span><strong className={`text-2xl ${item.tone}`}>{item.count}</strong>
                 </button>
@@ -1897,12 +1963,12 @@ export default function AdminDashboard() {
                       placeholder="Tên tài liệu, học phần, người đăng..."
                       aria-label="Tìm tài liệu trong trang quản trị"
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={(e) => { setSearchQuery(e.target.value); setDocumentPage({ key: "", page: 1 }); }}
                       className="pl-9 h-9 text-xs bg-card border-border text-foreground rounded-xl"
                     />
                   </div>
 
-                  <Select value={docFilterStatus} onValueChange={setDocFilterStatus}>
+                  <Select value={docFilterStatus} onValueChange={value => { setDocFilterStatus(value); setDocumentPage({ key: "", page: 1 }); }}>
                     <SelectTrigger className="w-[140px] h-9 text-xs bg-card border-border text-foreground rounded-xl">
                       <SelectValue placeholder="Trạng thái" />
                     </SelectTrigger>
@@ -1913,14 +1979,14 @@ export default function AdminDashboard() {
                       <SelectItem value="rejected">Bị từ chối</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={docSubjectFilter} onValueChange={setDocSubjectFilter}>
+                  <Select value={docSubjectFilter} onValueChange={value => { setDocSubjectFilter(value); setDocumentPage({ key: "", page: 1 }); }}>
                     <SelectTrigger aria-label="Lọc tài liệu theo học phần" className="w-[180px] h-9 text-xs bg-card border-border text-foreground rounded-xl"><SelectValue placeholder="Học phần" /></SelectTrigger>
                     <SelectContent className="bg-card border-border text-foreground">
                       <SelectItem value="all">Mọi học phần</SelectItem>
                       {subjects.map((subject) => <SelectItem key={subject.id} value={subject.name}>{subject.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Select value={docSourceFilter} onValueChange={setDocSourceFilter}>
+                  <Select value={docSourceFilter} onValueChange={value => { setDocSourceFilter(value); setDocumentPage({ key: "", page: 1 }); }}>
                     <SelectTrigger aria-label="Lọc theo tình trạng tệp" className="w-[150px] h-9 text-xs bg-card border-border text-foreground rounded-xl"><SelectValue /></SelectTrigger>
                     <SelectContent className="bg-card border-border text-foreground">
                       <SelectItem value="all">Tất cả tệp</SelectItem><SelectItem value="missing">Thiếu tệp nguồn</SelectItem><SelectItem value="ready">Tệp sẵn sàng</SelectItem>
@@ -1993,7 +2059,7 @@ export default function AdminDashboard() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleDeleteDoc(doc._id || doc.id)}
+                                    onClick={() => handleDeleteDoc(doc._id || doc.id, doc.title)}
                                     className="h-7 px-2 border-border text-destructive hover:bg-destructive/10 rounded-lg cursor-pointer"
                                     title="Xóa vĩnh viễn (Chỉ Admin)"
                                   >
@@ -2008,13 +2074,7 @@ export default function AdminDashboard() {
                     </TableBody>
                   </Table>
                 </div>
-                {documentPages > 1 && (
-                  <nav aria-label="Phân trang kho tài liệu quản trị" className="flex items-center justify-center gap-4 border-t border-border p-4 text-xs">
-                    <Button size="sm" variant="outline" disabled={currentDocumentPage <= 1} onClick={() => setDocumentPage({ key: documentPageKey, page: currentDocumentPage - 1 })}>Trang trước</Button>
-                    <span>{currentDocumentPage}/{documentPages}</span>
-                    <Button size="sm" variant="outline" disabled={currentDocumentPage >= documentPages} onClick={() => setDocumentPage({ key: documentPageKey, page: currentDocumentPage + 1 })}>Trang sau</Button>
-                  </nav>
-                )}
+                {!loading && <div className="px-5"><Pagination label="Phân trang kho tài liệu quản trị" itemLabel="tài liệu" page={currentDocumentPage} total={filteredDocs.length} pageSize={20} onPageChange={page => setDocumentPage({ key: documentPageKey, page })} /></div>}
               </CardContent>
             </Card>
           )}
@@ -2022,17 +2082,18 @@ export default function AdminDashboard() {
           {/* ================= TAB 4: SUBJECTS MANAGEMENT ================= */}
           {activeTab === "subjects" && (
             <Card className="bg-card border-border/80 text-foreground rounded-2xl shadow-xs overflow-hidden p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-border/60 pb-4">
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-4">
                 <div>
                   <h3 className="text-base font-bold text-foreground">Danh mục học phần ({subjects.length})</h3>
-                  <p className="text-xs text-muted-foreground">Học phần dùng khi thành viên phân loại tài liệu tải lên</p>
+                  <p className="text-sm text-muted-foreground mt-1">Phân loại tài liệu và quản lý học phần đang sử dụng.</p>
                 </div>
                 {!isModerator && (
                   <Button
                     type="button"
                     size="sm"
-                    onClick={handleOpenSubjectModal}
-                    className="h-9 bg-primary hover:bg-primary text-primary-foreground rounded-xl text-xs font-semibold"
+                    onClick={() => handleOpenSubjectModal()}
+                    disabled={subjectSaving}
+                    className="h-10 bg-primary hover:bg-primary text-primary-foreground rounded-xl text-sm font-semibold"
                   >
                     <Plus className="w-3.5 h-3.5 mr-1.5" />
                     Thêm học phần
@@ -2040,23 +2101,28 @@ export default function AdminDashboard() {
                 )}
               </div>
 
-              <Input aria-label="Tìm học phần" placeholder="Tìm theo tên hoặc mã học phần..." value={subjectSearch} onChange={(event) => setSubjectSearch(event.target.value)} className="max-w-md bg-card border-border text-foreground" />
-              {filteredSubjects.length === 0 ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <Input aria-label="Tìm học phần" placeholder="Tìm theo tên hoặc mã học phần..." value={subjectSearch} onChange={(event) => { setSubjectSearch(event.target.value); setSubjectPage({ key: "", page: 1 }); }} className="min-w-0 w-full sm:flex-1 sm:min-w-[240px] max-w-md bg-card border-border text-foreground" />
+                <select aria-label="Trạng thái học phần" value={subjectStatusFilter} onChange={event => { setSubjectStatusFilter(event.target.value); setSubjectPage({ key: "", page: 1 }); }} className="h-10 w-full sm:w-auto rounded-xl border border-border bg-card px-3 text-sm text-foreground">
+                  <option value="all">Tất cả trạng thái</option><option value="active">Đang sử dụng</option><option value="inactive">Ngừng sử dụng</option>
+                </select>
+              </div>
+              {loading ? <div role="status" className="flex items-center justify-center gap-2 py-14 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />Đang tải học phần…</div> : filteredSubjects.length === 0 ? (
                 <div className="py-14 text-center rounded-xl border border-dashed border-border bg-card/30">
                   <GraduationCap className="w-9 h-9 mx-auto text-foreground mb-2" />
-                  <p className="text-sm font-semibold text-muted-foreground">{subjectSearch ? "Không tìm thấy học phần phù hợp" : "Chưa có học phần"}</p>
+                  <p className="text-sm font-semibold text-muted-foreground">{subjectSearch || subjectStatusFilter !== "all" ? "Không tìm thấy học phần phù hợp" : "Chưa có học phần"}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {isModerator
+                    {subjectSearch || subjectStatusFilter !== "all" ? "Thử từ khóa hoặc trạng thái khác." : isModerator
                       ? "Quản trị viên chưa tạo học phần nào."
                       : "Nhấn “Thêm học phần” để tạo danh mục đầu tiên."}
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {filteredSubjects.map((sub) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                  {visibleSubjects.map((sub) => (
                   <div
                     key={sub.id}
-                    className="p-4 rounded-xl bg-card/80 border border-border/80 flex flex-col justify-between gap-3 hover:border-primary/40 transition-colors"
+                    className="subject-admin-card min-w-0 p-4 rounded-xl bg-card/80 border border-border/80 flex flex-col justify-between gap-4 hover:border-primary/40 transition-colors"
                   >
                     <div className="space-y-1">
                       {sub.code && (
@@ -2064,14 +2130,19 @@ export default function AdminDashboard() {
                           {sub.code}
                         </span>
                       )}
-                      <h4 className="font-bold text-foreground text-sm pt-1">{sub.name}</h4>
-                      <p className="text-[11px] text-muted-foreground">{sub.count} tài liệu học tập</p>
-                      <span className={`inline-flex rounded-lg px-2 py-1 text-[10px] ${sub.active === false ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>{sub.active === false ? "Ngừng hoạt động" : "Đang sử dụng"}</span>
+                      <h4 className="font-bold text-foreground text-base leading-relaxed [overflow-wrap:anywhere] pt-1">{sub.name}</h4>
+                      <p className="text-sm text-muted-foreground">{sub.count || 0} tài liệu học tập</p>
+                      <span className={`inline-flex rounded-lg px-2 py-1 text-xs ${sub.active === false ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>{sub.active === false ? "Ngừng sử dụng" : "Đang sử dụng"}</span>
                     </div>
+                    {!isModerator && <div className="flex gap-2 border-t border-border pt-3">
+                      <Button type="button" variant="outline" size="sm" className="flex-1" aria-label={`Sửa học phần ${sub.name}`} disabled={subjectSaving} onClick={() => handleOpenSubjectModal(sub)}><Pencil size={15} className="mr-1.5" />Sửa</Button>
+                      <Button type="button" variant="outline" size="sm" className="flex-1 text-destructive hover:text-destructive" aria-label={`Xóa học phần ${sub.name}`} disabled={subjectSaving} onClick={() => { setSubjectDeleteError(""); setDeletingSubject(sub); }}><Trash2 size={15} className="mr-1.5" />Xóa</Button>
+                    </div>}
                   </div>
                   ))}
                 </div>
               )}
+              {!loading && <Pagination label="Phân trang học phần" itemLabel="học phần" page={currentSubjectPage} total={filteredSubjects.length} pageSize={subjectPageSize} onPageChange={page => setSubjectPage({ key: subjectPageKey, page })} />}
             </Card>
           )}
 
@@ -2409,7 +2480,7 @@ export default function AdminDashboard() {
                       <TableBody>
                         {auditLogs.map((log) => {
                           const title = log.metadata?.title || log.metadata?.documentTitle || "Tài liệu / báo cáo";
-                          const actionLabel = log.action === "document_status_changed" ? "Đổi trạng thái tài liệu" : log.action === "report_status_changed" ? "Xử lý báo cáo" : log.action;
+                          const actionLabel = ({ document_status_changed: "Đổi trạng thái tài liệu", report_status_changed: "Xử lý báo cáo", subject_updated: "Cập nhật học phần", subject_deleted: "Xóa học phần" })[log.action] || log.action;
                           return (
                             <TableRow key={log._id} className="border-border/60 hover:bg-card/40">
                               <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(log.createdAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}</TableCell>
@@ -2571,9 +2642,9 @@ export default function AdminDashboard() {
         <DialogContent className="sm:max-w-[440px] p-6 rounded-2xl bg-card border-border text-foreground shadow-2xl">
           <form onSubmit={handleCreateSubject} className="space-y-5">
             <DialogHeader className="space-y-1">
-              <DialogTitle className="text-base font-bold text-foreground">Thêm học phần mới</DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground">
-                Học phần mới sẽ xuất hiện trong danh sách phân loại khi tải tài liệu lên.
+              <DialogTitle className="text-lg font-bold text-foreground">{editingSubject ? "Sửa học phần" : "Thêm học phần mới"}</DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground">
+                {editingSubject ? "Đổi tên sẽ cập nhật học phần trên các tài liệu liên quan." : "Học phần mới sẽ xuất hiện trong danh sách phân loại khi tải tài liệu lên."}
               </DialogDescription>
             </DialogHeader>
 
@@ -2586,29 +2657,40 @@ export default function AdminDashboard() {
                   id="subject-name"
                   autoFocus
                   maxLength={120}
+                  disabled={subjectSaving}
                   value={newSubjectName}
                   onChange={(event) => setNewSubjectName(event.target.value)}
                   placeholder="Ví dụ: Kiến trúc máy tính"
-                  className="h-10 text-xs bg-card border-border text-foreground rounded-xl"
+                  className="h-11 text-sm bg-card border-border text-foreground rounded-xl"
                 />
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="subject-code" className="text-xs font-semibold text-muted-foreground">
-                  Mã học phần <span className="font-normal text-muted-foreground">(tùy chọn)</span>
+                  Mã học phần <span className="font-normal text-muted-foreground">{editingSubject ? "" : "(tự động)"}</span>
                 </Label>
                 <Input
                   id="subject-code"
                   maxLength={20}
+                  readOnly={!editingSubject}
+                  disabled={subjectSaving}
                   value={newSubjectCode}
                   onChange={(event) => setNewSubjectCode(event.target.value.toUpperCase())}
-                  placeholder="Ví dụ: IT3020"
-                  className="h-10 text-xs font-mono uppercase bg-card border-border text-foreground rounded-xl"
+                  placeholder="Mã sẽ được tạo tự động"
+                  className="h-11 text-sm font-mono uppercase bg-card border-border text-foreground rounded-xl"
                 />
               </div>
 
+              {editingSubject && <div className="space-y-1.5">
+                <Label htmlFor="subject-active">Trạng thái</Label>
+                <select id="subject-active" value={subjectActive ? "active" : "inactive"} disabled={subjectSaving} onChange={event => setSubjectActive(event.target.value === "active")} className="h-11 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground">
+                  <option value="active">Đang sử dụng</option><option value="inactive">Ngừng sử dụng</option>
+                </select>
+                <p className="text-xs leading-relaxed text-muted-foreground">Ngừng sử dụng sẽ ẩn học phần khỏi lựa chọn khi đăng tài liệu mới. Tài liệu đã có vẫn được giữ lại.</p>
+              </div>}
+
               {subjectError && (
-                <div className="flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
+                <div role="alert" className="flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
                   <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>{subjectError}</span>
                 </div>
@@ -2638,12 +2720,31 @@ export default function AdminDashboard() {
                   </>
                 ) : (
                   <>
-                    <Plus className="w-3.5 h-3.5 mr-1.5" /> Thêm học phần
+                    <Check className="w-3.5 h-3.5 mr-1.5" /> {editingSubject ? "Lưu thay đổi" : "Thêm học phần"}
                   </>
                 )}
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(deletingSubject)} onOpenChange={open => { if (!open && !subjectMutationRef.current) setDeletingSubject(null); }}>
+        <DialogContent className="sm:max-w-[440px] rounded-2xl bg-card text-foreground">
+          <DialogHeader>
+            <DialogTitle>Xóa học phần?</DialogTitle>
+            <DialogDescription className="[overflow-wrap:anywhere]">
+              Học phần “{deletingSubject?.name}” sẽ được gỡ khỏi danh mục.
+            </DialogDescription>
+          </DialogHeader>
+          {(deletingSubject?.count || 0) > 0 ? <p className="rounded-xl bg-muted p-3 text-sm leading-relaxed">Học phần này có {deletingSubject.count} tài liệu nên chưa thể xóa. Bạn có thể ngừng sử dụng học phần để giữ lại tài liệu hiện có.</p>
+            : <p className="text-sm text-muted-foreground">Chỉ học phần chưa có tài liệu mới được xóa. Hệ thống sẽ kiểm tra lại trước khi thực hiện.</p>}
+          {subjectDeleteError && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{subjectDeleteError}</p>}
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" disabled={subjectSaving} onClick={() => setDeletingSubject(null)}>Hủy</Button>
+            {(deletingSubject?.count || 0) > 0 ? <Button type="button" onClick={() => { const subject = deletingSubject; setDeletingSubject(null); handleOpenSubjectModal(subject); }}>Sửa trạng thái</Button>
+              : <Button type="button" variant="destructive" disabled={subjectSaving} onClick={handleDeleteSubject}>{subjectSaving ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Trash2 size={16} className="mr-2" />} {subjectSaving ? "Đang xóa…" : "Xóa học phần"}</Button>}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -2898,6 +2999,24 @@ export default function AdminDashboard() {
               ) : (
                 "Lưu thay đổi vai trò"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(deleteConfirmation)} onOpenChange={open => { if (!open) setDeleteConfirmation(null); }}>
+        <DialogContent className="sm:max-w-[440px] rounded-2xl bg-card text-foreground">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Trash2 size={18} className="text-destructive" /> Xác nhận xóa</DialogTitle>
+            <DialogDescription className="[overflow-wrap:anywhere]">
+              {deleteConfirmation?.type === "document"
+                ? <>Tài liệu “{deleteConfirmation.title}” sẽ bị xóa vĩnh viễn khỏi hệ thống. Hành động này không thể hoàn tác.</>
+                : "Bản ghi báo cáo này sẽ bị xóa khỏi hệ thống. Hành động này không thể hoàn tác."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setDeleteConfirmation(null)}>Hủy</Button>
+            <Button type="button" variant="destructive" onClick={handleConfirmDelete}>
+              <Trash2 size={16} className="mr-2" /> Xóa vĩnh viễn
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -51,11 +51,11 @@ test('suggestions prioritize title matches, deduplicate, limit results and never
     const base = filter.$and?.[0]?.status ? filter.$and[0] : filter;
     assert.equal(base.status, 'approved'); assert.equal(base.avgRating.$gte, 3);
     const items = ++calls === 1 ? [first] : broader;
-    return { sort() { return this; }, limit(count) { assert.equal(count, 6); return this; }, select(fields) { assert.equal(fields, 'title subjectName fileType'); return this; }, lean: async () => items };
+    return { sort() { return this; }, limit(count) { assert.equal(count, 6); return this; }, select(fields) { assert.equal(fields, 'title subjectName fileType variantGroupId'); return this; }, lean: async () => items };
   });
   t.mock.method(Document, 'aggregate', async pipeline => {
     assert.equal(pipeline[0].$match.$and[0].status, 'approved');
-    assert.equal(pipeline[3].$limit, 3);
+    assert.ok(pipeline.some(stage => stage.$limit === 3));
     return [{ name: 'Giải tích', count: 2 }];
   });
   const res = response(); await getSearchSuggestions({query:{q:'giai',minRating:'3'}},res);

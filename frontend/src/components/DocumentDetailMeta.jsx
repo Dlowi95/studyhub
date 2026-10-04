@@ -1,4 +1,5 @@
-import { Download, Eye, Star, Tag, FileText } from "lucide-react";
+import { Download, Eye, Star, Tag } from "lucide-react";
+import FileTypeIcon from "@/components/FileTypeIcon";
 
 export default function DocumentDetailMeta({ doc }) {
   if (!doc) return null;
@@ -51,7 +52,7 @@ export default function DocumentDetailMeta({ doc }) {
         {/* File Format & Size */}
         <div className="rounded-2xl border border-border/80 bg-card p-4 hover:border-primary transition-all shadow-xs">
           <div className="mb-1.5 flex items-center gap-1.5 text-muted-foreground text-xs font-semibold">
-            <FileText className="w-3.5 h-3.5 text-primary " />
+            <FileTypeIcon format={doc.type || doc.fileType} className="document-format-meta-icon" />
             Định dạng
           </div>
           <div className="text-xl md:text-2xl font-extrabold text-foreground uppercase">

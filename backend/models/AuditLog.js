@@ -17,6 +17,8 @@ const auditLogSchema = new mongoose.Schema(
         "user_role_changed",
         "user_status_changed",
         "subject_created",
+        "subject_updated",
+        "subject_deleted",
       ],
       required: true,
       index: true,

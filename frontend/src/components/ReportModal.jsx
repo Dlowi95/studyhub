@@ -1,10 +1,10 @@
+import { API_URL } from "@/lib/api";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 export default function ReportModal({ isOpen, onClose, document: doc, onSuccess }) {
   const [reason, setReason] = useState("wrong_subject");

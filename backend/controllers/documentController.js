@@ -1,6 +1,7 @@
 const path = require("path");
 const cloudinary = require("../config/cloudinary");
 const Document = require("../models/Document");
+const DocumentDownload = require("../models/DocumentDownload");
 const mongoose = require("mongoose");
 const { buildPublicDocumentQuery, searchPattern } = require("../utils/documentQuery");
 const { resolveSubject } = require("../utils/resolveSubject");
@@ -16,11 +17,16 @@ const {
 const {
   notifyDocumentStatus,
   notifyDocumentSubmitted,
+  notifyFollowersOfNewDocument,
 } = require("../utils/notificationService");
 const { claimInteraction } = require("../utils/trackDocumentInteraction");
 
 const getInteractionSession = (req) => {
   if (!req?.headers) return null;
+  if (req.user?._id) return `user:${req.user._id}`;
+  // For anonymous visitors, prefer the network/browser fingerprint so clearing
+  // localStorage on every refresh does not create a fresh view identity.
+  if (req.ip) return `${req.ip}:${req.headers["user-agent"] || ""}`;
   const explicit = req.headers["x-studyhub-session"];
   if (explicit) return explicit;
   return `${req.ip || "anonymous"}:${req.headers["user-agent"] || ""}`;
@@ -55,13 +61,34 @@ exports.uploadDocument = async (req, res) => {
   let storedSource;
   let saved = false;
   try {
-    const { title, description, subjectId, subjectName, tags } = req.body;
+    const { title: submittedTitle, description: submittedDescription, subjectId, subjectName, tags, variantOf } = req.body;
     const uploaderId = req.user?._id;
 
     if (!req.file) {
       return res.status(400).json({ message: "Vui lòng chọn file để upload" });
     }
 
+    let variantRoot = null;
+    if (variantOf) {
+      if (!mongoose.isObjectIdOrHexString(variantOf)) {
+        return res.status(400).json({ message: "Tài liệu gốc không hợp lệ" });
+      }
+      const targetDocument = await Document.findOne({ _id: variantOf, status: "approved" });
+      if (!targetDocument) {
+        return res.status(404).json({ message: "Tài liệu gốc không còn công khai" });
+      }
+      const rootId = targetDocument.variantGroupId || targetDocument._id;
+      variantRoot = targetDocument.variantGroupId
+        ? await Document.findById(rootId)
+        : targetDocument;
+      if (!variantRoot) {
+        return res.status(409).json({ message: "Nhóm tài liệu gốc không còn khả dụng" });
+      }
+    }
+
+    const title = variantRoot?.title || submittedTitle;
+    const description = variantRoot?.description || submittedDescription;
+    const finalTags = variantRoot?.tags || tags;
     if (typeof title !== "string" || !title.trim() || title.trim().length > 200) {
       return res.status(400).json({
         message: "Tiêu đề phải từ 1 đến 200 ký tự",
@@ -70,8 +97,10 @@ exports.uploadDocument = async (req, res) => {
     if (description !== undefined && (typeof description !== "string" || description.length > 10000)) {
       return res.status(400).json({ message: "Mô tả tối đa 10.000 ký tự" });
     }
-    const subject = await resolveSubject(subjectId, subjectName);
-    const parsedTags = Array.isArray(tags) ? tags : typeof tags === "string" ? tags.split(",") : [];
+    const subject = variantRoot
+      ? { subjectId: variantRoot.subjectId, subjectName: variantRoot.subjectName }
+      : await resolveSubject(subjectId, subjectName);
+    const parsedTags = Array.isArray(finalTags) ? finalTags : typeof finalTags === "string" ? finalTags.split(",") : [];
     if (parsedTags.length > 20 || parsedTags.some((tag) => typeof tag !== "string" || tag.length > 80)) {
       return res.status(400).json({ message: "Tối đa 20 từ khóa, mỗi từ khóa tối đa 80 ký tự" });
     }
@@ -79,6 +108,23 @@ exports.uploadDocument = async (req, res) => {
     const fileValidation = validateDocumentFile(req.file);
     if (!fileValidation.valid) {
       return res.status(400).json({ message: fileValidation.message });
+    }
+
+    if (variantRoot) {
+      const groupId = variantRoot.variantGroupId || variantRoot._id;
+      const duplicateFormat = await Document.exists({
+        $and: [
+          { $or: [{ _id: groupId }, { variantGroupId: groupId }] },
+          { fileType: fileValidation.fileType },
+          { status: { $ne: "rejected" } },
+        ],
+      });
+      if (duplicateFormat) {
+        return res.status(409).json({
+          message: `Tài liệu này đã có bản ${fileValidation.fileType}. Hãy chọn tài liệu mới nếu đây là nội dung khác.`,
+          code: "DOCUMENT_FORMAT_EXISTS",
+        });
+      }
     }
 
     if (cloudinary.isConfigured) {
@@ -112,6 +158,12 @@ exports.uploadDocument = async (req, res) => {
       storedSource = await saveToGridFs(req.file, req);
     }
 
+    if (variantRoot && !variantRoot.variantGroupId) {
+      variantRoot.variantGroupId = variantRoot._id;
+      variantRoot.variantFormatKey = variantRoot.fileType;
+      await variantRoot.save();
+    }
+
     const doc = new Document({
       title: title.trim(),
       description: description?.trim() || "",
@@ -122,6 +174,8 @@ exports.uploadDocument = async (req, res) => {
       storageProvider: storedSource.storageProvider,
       storageKey: storedSource.storageKey,
       ...subject,
+      variantGroupId: variantRoot ? (variantRoot.variantGroupId || variantRoot._id) : null,
+      variantFormatKey: variantRoot ? fileValidation.fileType : undefined,
       uploaderId: uploaderId || null,
       tags: [...new Set(parsedTags.map((tag) => tag.trim()).filter(Boolean))],
       status: "pending",
@@ -139,6 +193,9 @@ exports.uploadDocument = async (req, res) => {
     });
   } catch (error) {
     if (storedSource && !saved) await deleteDocumentPhysicalFile(storedSource);
+    if (error.code === 11000) {
+      return res.status(409).json({ message: "Định dạng này vừa được người khác thêm vào tài liệu." });
+    }
     console.error(error);
     return res.status(error.status || 500).json({
       message: error.status ? error.message : "Lỗi upload tài liệu",
@@ -150,21 +207,79 @@ exports.uploadDocument = async (req, res) => {
 exports.getDocuments = async (req, res) => {
   try {
     const { query, sort, page: pageNum, limit: perPage } = buildPublicDocumentQuery(req.query);
-    const docsQuery = Document.find(query).sort(sort);
-
-    const [docs, total] = await Promise.all([
-      docsQuery
-        .skip((pageNum - 1) * perPage)
-        .limit(perPage)
-        .populate("uploaderId", "name"),
-      Document.countDocuments(query),
+    const resourceSort = sort.downloadCount
+      ? { resourceDownloads: -1, resourceUpdatedAt: -1, _id: 1 }
+      : sort.avgRating
+        ? { resourceRating: -1, resourceUpdatedAt: -1, _id: 1 }
+        : { resourceUpdatedAt: -1, _id: 1 };
+    const groupStages = [
+      { $match: query },
+      { $sort: sort },
+      {
+        $group: {
+          _id: { $ifNull: ["$variantGroupId", "$_id"] },
+          document: { $first: "$$ROOT" },
+          resourceDownloads: { $sum: { $ifNull: ["$downloadCount", 0] } },
+          resourceViews: { $sum: { $ifNull: ["$viewCount", 0] } },
+          variantCount: { $sum: 1 },
+          availableFormats: { $addToSet: "$fileType" },
+          ratingTotal: { $sum: { $cond: [{ $gt: ["$avgRating", 0] }, "$avgRating", 0] } },
+          ratedVariants: { $sum: { $cond: [{ $gt: ["$avgRating", 0] }, 1, 0] } },
+          resourceUpdatedAt: { $max: "$createdAt" },
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          resourceDownloads: 1,
+          resourceViews: 1,
+          variantCount: 1,
+          availableFormats: 1,
+          resourceUpdatedAt: 1,
+          resourceRating: { $cond: [{ $gt: ["$ratedVariants", 0] }, { $divide: ["$ratingTotal", "$ratedVariants"] }, 0] },
+          document: {
+            $mergeObjects: ["$document", {
+              variantGroupId: "$_id",
+              resourceGroupId: "$_id",
+              variantCount: "$variantCount",
+              availableFormats: "$availableFormats",
+              downloadCount: "$resourceDownloads",
+              viewCount: "$resourceViews",
+              avgRating: { $cond: [{ $gt: ["$ratedVariants", 0] }, { $divide: ["$ratingTotal", "$ratedVariants"] }, 0] },
+            }],
+          },
+        },
+      },
+      { $sort: resourceSort },
+      { $skip: (pageNum - 1) * perPage },
+      { $limit: perPage },
+      { $replaceRoot: { newRoot: "$document" } },
+      { $lookup: { from: "users", localField: "uploaderId", foreignField: "_id", as: "uploaderInfo" } },
+      {
+        $addFields: {
+          uploaderInfo: {
+            $map: {
+              input: "$uploaderInfo",
+              as: "uploader",
+              in: { _id: "$$uploader._id", name: "$$uploader.name", avatarUrl: "$$uploader.avatarUrl" },
+            },
+          },
+        },
+      },
+      { $addFields: { uploaderId: { $ifNull: [{ $arrayElemAt: ["$uploaderInfo", 0] }, "$uploaderId"] } } },
+      { $project: { uploaderInfo: 0 } },
+    ];
+    const [docs, countResult] = await Promise.all([
+      Document.aggregate(groupStages),
+      Document.aggregate([{ $match: query }, { $group: { _id: { $ifNull: ["$variantGroupId", "$_id"] } } }, { $count: "total" }]),
     ]);
+    const total = countResult[0]?.total || 0;
 
     const items = await Promise.all(
       docs.map(async (document) => {
         const sourceStatus = await checkDocumentSource(document.fileUrl);
         return {
-          ...document.toObject(),
+          ...document,
           fileAvailable: sourceStatus.available,
           fileIssue: sourceStatus.issue,
           storageProvider: document.storageProvider || sourceStatus.storage,
@@ -187,25 +302,94 @@ exports.getDocuments = async (req, res) => {
   }
 };
 
+exports.getDocumentVariants = async (req, res) => {
+  try {
+    if (!mongoose.isObjectIdOrHexString(req.params.id)) {
+      return res.status(400).json({ message: "Mã tài liệu không hợp lệ" });
+    }
+    const selected = await Document.findOne({ _id: req.params.id, status: "approved" });
+    if (!selected) return res.status(404).json({ message: "Không tìm thấy tài liệu" });
+    const groupId = selected.variantGroupId || selected._id;
+    const explicitGroupQuery = {
+      $or: [{ _id: groupId }, { variantGroupId: groupId }],
+      status: "approved",
+    };
+    const explicitVariants = await Document.find(explicitGroupQuery)
+      .populate("uploaderId", "name")
+      .sort({ fileType: 1, createdAt: 1 });
+
+    // Older uploads may have been submitted as separate documents instead of
+    // using the "add another format" flow. Treat an exact title + course match
+    // as a format candidate, but only when it adds a file type the group lacks.
+    const subjectMatch = selected.subjectId
+      ? { subjectId: selected.subjectId }
+      : { subjectName: selected.subjectName };
+    const legacyCandidates = await Document.find({
+      ...subjectMatch,
+      title: selected.title,
+      status: "approved",
+      _id: { $ne: selected._id },
+      $or: [{ variantGroupId: null }, { variantGroupId: { $exists: false } }],
+    })
+      .populate("uploaderId", "name")
+      .sort({ fileType: 1, createdAt: 1 });
+    const existingFormats = new Set(explicitVariants.map((variant) => variant.fileType));
+    const legacyByNewFormat = new Map();
+    for (const candidate of legacyCandidates) {
+      if (!existingFormats.has(candidate.fileType) && !legacyByNewFormat.has(candidate.fileType)) {
+        legacyByNewFormat.set(candidate.fileType, candidate);
+      }
+    }
+    const variants = [...explicitVariants, ...legacyByNewFormat.values()]
+      .sort((left, right) => String(left.fileType).localeCompare(String(right.fileType)));
+    const items = await Promise.all(variants.map(async (variant) => {
+      const sourceStatus = await checkDocumentSource(variant.fileUrl);
+      return {
+        ...variant.toObject(),
+        fileAvailable: sourceStatus.available,
+        fileIssue: sourceStatus.issue,
+        storageProvider: variant.storageProvider || sourceStatus.storage,
+      };
+    }));
+    return res.json({ variants: items, selectedId: selected._id });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Không thể tải các định dạng của tài liệu" });
+  }
+};
+
 exports.getSearchSuggestions = async (req, res) => {
   try {
     const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 200) : "";
     if (q.length < 2) return res.json({ documents: [], subjects: [] });
     const { query } = buildPublicDocumentQuery(req.query);
     const titleMatch = { title: { $regex: searchPattern(q), $options: "i" } };
-    const projection = "title subjectName fileType";
+    const projection = "title subjectName fileType variantGroupId";
     const [titleDocuments, otherDocuments, subjects] = await Promise.all([
       Document.find({ $and: [query, titleMatch] }).sort({ downloadCount: -1, createdAt: -1, _id: -1 }).limit(6).select(projection).lean(),
       Document.find(query).sort({ downloadCount: -1, createdAt: -1, _id: -1 }).limit(6).select(projection).lean(),
       Document.aggregate([
         { $match: { $and: [query, { subjectName: { $regex: searchPattern(q), $options: "i" } }] } },
+        { $group: { _id: { $ifNull: ["$variantGroupId", "$_id"] }, subjectName: { $first: "$subjectName" } } },
         { $group: { _id: "$subjectName", count: { $sum: 1 } } },
         { $sort: { count: -1, _id: 1 } }, { $limit: 3 },
         { $project: { _id: 0, name: "$_id", count: 1 } },
       ]),
     ]);
-    const unique = new Map([...titleDocuments, ...otherDocuments].map((doc) => [String(doc._id), doc]));
-    return res.json({ documents: [...unique.values()].slice(0, 6), subjects });
+    const unique = new Map();
+    for (const doc of [...titleDocuments, ...otherDocuments]) {
+      const key = String(doc.variantGroupId || doc._id);
+      const current = unique.get(key) || { ...doc, documentIds: new Set(), availableFormats: new Set() };
+      current.documentIds.add(String(doc._id));
+      if (doc.fileType) current.availableFormats.add(doc.fileType);
+      unique.set(key, current);
+    }
+    const documents = [...unique.values()].slice(0, 6).map(({ documentIds, availableFormats, ...doc }) => ({
+      ...doc,
+      variantCount: documentIds.size,
+      availableFormats: [...availableFormats],
+    }));
+    return res.json({ documents, subjects });
   } catch (error) {
     return res.status(error.status || 500).json({ message: error.status ? error.message : "Chưa tải được gợi ý tìm kiếm" });
   }
@@ -277,11 +461,19 @@ exports.updateDocumentStatus = async (req, res) => {
     const previousStatus = doc.status;
     applyModerationNote(doc, status, req.body.moderationNote);
     doc.status = status;
+    if (doc.variantGroupId) {
+      doc.variantFormatKey = status === "rejected" ? undefined : doc.fileType;
+    }
     await doc.save();
     if (previousStatus !== status) {
       await notifyDocumentStatus(doc, status).catch((notificationError) => {
         console.error("Không thể tạo thông báo trạng thái tài liệu:", notificationError.message);
       });
+      if (previousStatus !== "approved" && status === "approved") {
+        await notifyFollowersOfNewDocument(doc).catch((notificationError) => {
+          console.error("Không thể thông báo tài liệu mới cho người theo dõi:", notificationError.message);
+        });
+      }
     }
 
     return res.json({
@@ -299,7 +491,7 @@ exports.updateDocumentStatus = async (req, res) => {
 exports.getDocumentStats = async (req, res) => {
   try {
     const match = req.user && ["admin", "moderator"].includes(req.user.role) ? {} : { status: "approved" };
-    const [stats, bySubject, monthlyUploads] = await Promise.all([
+    const [stats, bySubject, monthlyUploads, approvedResourceCount] = await Promise.all([
       Document.aggregate([
         { $match: match },
         {
@@ -349,7 +541,22 @@ exports.getDocumentStats = async (req, res) => {
         },
         { $sort: { "_id.year": 1, "_id.month": 1 } },
       ]),
+      Document.aggregate([
+        { $match: { ...match, status: "approved" } },
+        { $group: { _id: { $ifNull: ["$variantGroupId", "$_id"] } } },
+        { $count: "total" },
+      ]),
     ]);
+    const summary = stats[0] || {
+      totalDocuments: 0,
+      approved: 0,
+      pending: 0,
+      rejected: 0,
+      totalViews: 0,
+      totalDownloads: 0,
+      totalSubjects: 0,
+    };
+    summary.approvedResources = approvedResourceCount[0]?.total || 0;
 
     const monthlyUploadMap = new Map(
       monthlyUploads.map((item) => [
@@ -365,15 +572,7 @@ exports.getDocumentStats = async (req, res) => {
     });
 
     return res.json({
-      summary: stats[0] || {
-        totalDocuments: 0,
-        approved: 0,
-        pending: 0,
-        rejected: 0,
-        totalViews: 0,
-        totalDownloads: 0,
-        totalSubjects: 0,
-      },
+      summary,
       bySubject,
       monthlyUploads: uploadsByMonth,
     });
@@ -411,19 +610,32 @@ exports.incrementView = async (req, res) => {
 exports.incrementDownload = async (req, res) => {
   try {
     if (!mongoose.isObjectIdOrHexString(req.params.id)) return res.status(400).json({ message: "Mã tài liệu không hợp lệ" });
-    const sessionId = getInteractionSession(req);
-    if (sessionId && !(await claimInteraction({ documentId: req.params.id, type: "download", sessionId }))) {
-      return res.json({ message: "Lượt tải đã được ghi nhận gần đây", counted: false });
+    const approvedDocument = await Document.findOne({ _id: req.params.id, status: "approved" });
+    if (!approvedDocument) return res.status(404).json({ message: "Tài liệu không tồn tại" });
+
+    if (req.user?._id) {
+      try {
+        await DocumentDownload.create({ documentId: approvedDocument._id, userId: req.user._id });
+      } catch (error) {
+        if (error?.code !== 11000) throw error;
+        const currentDocument = await Document.findById(approvedDocument._id);
+        return res.json({ message: "Tài khoản này đã tải tài liệu trước đó", counted: false, document: currentDocument });
+      }
+    } else {
+      const sessionId = getInteractionSession(req);
+      if (sessionId && !(await claimInteraction({ documentId: req.params.id, type: "download", sessionId }))) {
+        const currentDocument = await Document.findById(approvedDocument._id);
+        return res.json({ message: "Lượt tải đã được ghi nhận gần đây", counted: false, document: currentDocument });
+      }
     }
+
     const doc = await Document.findOneAndUpdate(
       { _id: req.params.id, status: "approved" },
       { $inc: { downloadCount: 1 } },
       { new: true }
     );
 
-    if (!doc) {
-      return res.status(404).json({ message: "Tài liệu không tồn tại" });
-    }
+    if (!doc) return res.status(404).json({ message: "Tài liệu không tồn tại" });
 
     return res.json({ message: "Đã tăng lượt tải", counted: true, document: doc });
   } catch (error) {
@@ -438,13 +650,61 @@ exports.getMyDocuments = async (req, res) => {
       return res.status(401).json({ message: "Chưa xác thực người dùng" });
     }
 
-    const documents = await Document.find({ uploaderId: userId })
-      .sort({ createdAt: -1 })
+    const status = typeof req.query?.status === "string" ? req.query.status : "all";
+    if (!["all", "approved", "pending", "rejected"].includes(status)) {
+      return res.status(400).json({ message: "Trạng thái tài liệu không hợp lệ" });
+    }
+
+    const rawPage = req.query?.page === undefined ? 1 : Number(req.query.page);
+    if (!Number.isInteger(rawPage) || rawPage < 1 || rawPage > 100000) {
+      return res.status(400).json({ message: "Trang tài liệu không hợp lệ" });
+    }
+    const rawLimit = req.query?.limit === undefined ? 10 : Number(req.query.limit);
+    if (!Number.isInteger(rawLimit) || rawLimit < 1 || rawLimit > 50) {
+      return res.status(400).json({ message: "Số tài liệu mỗi trang phải từ 1 đến 50" });
+    }
+
+    const query = { uploaderId: userId };
+    if (status !== "all") query.status = status;
+    const search = typeof req.query?.q === "string" ? req.query.q.trim().slice(0, 120) : "";
+    if (search) {
+      query.$and = search.split(/\s+/).filter(Boolean).map((term) => ({
+        $or: ["title", "subjectName", "tags"].map((field) => ({
+          [field]: { $regex: searchPattern(term), $options: "i" },
+        })),
+      }));
+    }
+
+    const [total, summaryRows] = await Promise.all([
+      Document.countDocuments(query),
+      Document.aggregate([
+        { $match: { uploaderId: new mongoose.Types.ObjectId(userId) } },
+        { $group: {
+          _id: null,
+          total: { $sum: 1 },
+          approved: { $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] } },
+          pending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] } },
+          rejected: { $sum: { $cond: [{ $eq: ["$status", "rejected"] }, 1, 0] } },
+          totalViews: { $sum: "$viewCount" },
+          totalDownloads: { $sum: "$downloadCount" },
+        } },
+      ]),
+    ]);
+    const totalPages = Math.ceil(total / rawLimit);
+    const page = totalPages ? Math.min(rawPage, totalPages) : 1;
+    const documents = await Document.find(query)
+      .sort({ createdAt: -1, _id: -1 })
+      .skip((page - 1) * rawLimit)
+      .limit(rawLimit)
       .lean();
 
     return res.json({
       documents,
-      count: documents.length,
+      count: total,
+      page,
+      limit: rawLimit,
+      totalPages,
+      summary: summaryRows[0] || { total: 0, approved: 0, pending: 0, rejected: 0, totalViews: 0, totalDownloads: 0 },
     });
   } catch (error) {
     return res.status(500).json({

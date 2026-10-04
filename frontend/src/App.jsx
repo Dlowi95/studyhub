@@ -1,3 +1,4 @@
+import { API_URL } from "@/lib/api";
 import { clearAccountSession } from "@/lib/session";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
@@ -16,6 +17,7 @@ const Profile = lazy(() => import("./pages/Profile"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const UploadDocument = lazy(() => import("./pages/UploadDocument"));
 const DocumentDetailPage = lazy(() => import("./pages/DocumentDetailPage"));
+const SubjectDetailPage = lazy(() => import("./pages/SubjectDetailPage"));
 const MyReports = lazy(() => import("./pages/MyReports"));
 
 function PageLoadingFallback() {
@@ -62,7 +64,7 @@ function MainLayout() {
       return;
     }
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/notifications`, {
+      const res = await fetch(`${API_URL}/notifications`, {
         headers: { Authorization: `Bearer ${currentToken}` },
       });
       if (res.ok) {
@@ -80,7 +82,7 @@ function MainLayout() {
     const currentToken = token || localStorage.getItem("token");
     if (!currentToken) return;
     try {
-      await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/notifications/read-all`, {
+      await fetch(`${API_URL}/notifications/read-all`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${currentToken}` },
       });
@@ -95,7 +97,7 @@ function MainLayout() {
     const currentToken = token || localStorage.getItem("token");
     if (!notif.read && currentToken) {
       try {
-        await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/notifications/${notif._id}/read`, {
+        await fetch(`${API_URL}/notifications/${notif._id}/read`, {
           method: "PATCH",
           headers: { Authorization: `Bearer ${currentToken}` },
         });
@@ -127,7 +129,7 @@ function MainLayout() {
 
     if (storedToken) {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/auth/profile`, {
+        const response = await fetch(`${API_URL}/auth/profile`, {
           headers: { Authorization: `Bearer ${storedToken}` },
         });
         if (response.ok) {
@@ -225,19 +227,22 @@ function MainLayout() {
   // If on /admin route, render dedicated Admin layout without consumer header/footer
   if (isAdminRoute) {
     return (
-      <Suspense fallback={<PageLoadingFallback />}>
-        <Routes>
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute allowedRoles={["admin", "moderator"]}>
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/admin" replace />} />
-        </Routes>
-      </Suspense>
+      <>
+        <Suspense fallback={<PageLoadingFallback />}>
+          <Routes>
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "moderator"]}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<Navigate to="/admin" replace />} />
+          </Routes>
+        </Suspense>
+        <Toaster />
+      </>
     );
   }
 
@@ -250,6 +255,8 @@ function MainLayout() {
         <Suspense fallback={<PageLoadingFallback />}>
           <Routes>
             <Route path="/" element={<Home onOpenAuth={openAuth} user={user} />} />
+            <Route path="/subjects" element={<SubjectDetailPage onOpenAuth={openAuth} user={user} />} />
+            <Route path="/subjects/:subjectName" element={<SubjectDetailPage onOpenAuth={openAuth} user={user} />} />
             <Route path="/login" element={<AuthRedirect tab="login" onOpenAuth={openAuth} />} />
             <Route path="/register" element={<AuthRedirect tab="register" onOpenAuth={openAuth} />} />
             <Route path="/document/:id" element={<DocumentDetailPage />} />

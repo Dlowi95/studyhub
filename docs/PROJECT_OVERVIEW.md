@@ -10,7 +10,7 @@ StudyHub đã có giao diện và API cho toàn bộ nhóm chức năng cốt l�
 | --- | --- | --- |
 | Đăng tải tài liệu | Đăng nhập, chọn/kéo thả tệp, nhập thông tin, gửi chờ duyệt; hỗ trợ PDF, DOCX, PPTX, XLSX, TXT tối đa 25 MB | Thống nhất kiểm tra tệp ở hai màn đăng tải; kiểm tra tiêu đề, mô tả, từ khóa và học phần trước khi lưu; dọn tệp nếu lưu bản ghi thất bại |
 | Kiểm duyệt | Admin/moderator xem trước, duyệt hoặc từ chối; gửi thông báo cho người đăng | API công khai chỉ trả tài liệu đã duyệt; thống kê quản trị dùng API có xác thực; kiểm tra nguồn tệp khi admin đổi thông tin và duyệt |
-| Phân loại học phần | Danh mục học phần, admin thêm học phần, lọc tài liệu theo môn | Hai form lấy cùng danh mục từ server; chuẩn hóa tên và liên kết học phần đã lưu; không cho dùng học phần đã ngừng hoạt động; số liệu công khai chỉ tính tài liệu đã duyệt |
+| Phân loại học phần | Danh mục học phần, admin thêm/sửa/xóa học phần, lọc tài liệu theo môn | Đổi tên đồng bộ tài liệu liên quan bằng giao dịch; chỉ xóa học phần rỗng; học phần còn tài liệu có thể ngừng sử dụng; tìm kiếm, lọc trạng thái và phân trang dùng chung |
 | Tìm kiếm | Tìm tài liệu và lọc theo học phần | Tìm trên toàn kho thay vì chỉ 20 bản ghi đầu; hỗ trợ từ khóa tiếng Việt có/không dấu, tiêu đề/mô tả/học phần/từ khóa; phân trang và sắp xếp trên server; hủy request cũ khi đổi bộ lọc |
 | Đánh giá | Chấm 1–5 sao, nhận xét, mỗi tài khoản một đánh giá/tài liệu, xóa theo quyền | Chỉ nhận số nguyên 1–5 và nhận xét tối đa 1.000 ký tự; sửa URL API dự phòng; đồng bộ điểm trung bình trên trang chi tiết; nhận diện tài khoản sở hữu bằng cả `id` và `_id` |
 | Báo cáo vi phạm | Người dùng gửi báo cáo, xem kết quả; admin/moderator xử lý và phản hồi | Xử lý tài liệu và báo cáo trong một request; giữ tiêu đề/lịch sử báo cáo khi xóa tài liệu; giới hạn quyền xóa cho admin; mở lại báo cáo không tự công khai tài liệu; gửi báo cáo không tự gỡ tài liệu khỏi thư viện |
@@ -41,7 +41,7 @@ flowchart LR
 | Khách | Tìm kiếm, xem tài liệu đã duyệt và xem đánh giá |
 | Người dùng | Đăng tải; theo dõi/xóa tài liệu của mình; đánh giá; báo cáo và xem phản hồi của mình |
 | Moderator | Xem hàng đợi; duyệt/từ chối tài liệu; xử lý báo cáo; xem thống kê quản trị |
-| Admin | Các quyền kiểm duyệt; thêm học phần; sửa/xóa tài liệu; xóa báo cáo và quản lý tài khoản |
+| Admin | Các quyền kiểm duyệt; thêm/sửa/xóa học phần; sửa/xóa tài liệu; xóa báo cáo và quản lý tài khoản |
 
 ## 3. Kiến trúc hiện tại
 
@@ -109,3 +109,11 @@ npm run dev
 npm run lint
 npm run build
 ```
+
+## 8. Cập nhật giao diện và quản lý học phần — 03/10/2026
+
+- Font Plus Jakarta Sans được lưu trong `frontend/public/fonts`, gồm ký tự tiếng Việt và giấy phép OFL; giao diện không cần tải font từ Google. Tiêu đề quản trị giảm giãn chữ âm, tên tài liệu dài tự xuống dòng; navbar tăng từ 12px lên 15px.
+- Admin sửa tên, mã và trạng thái học phần qua `PUT /api/admin/subjects/:id`; `DELETE` cùng URL chỉ gỡ học phần chưa có tài liệu. Moderator chỉ xem. Học phần mặc định và danh mục cũ cũng sửa/xóa được.
+- Đổi tên cập nhật `Document.subjectId` và `subjectName` trong cùng giao dịch MongoDB. Bản đánh dấu xóa ngăn học phần mặc định xuất hiện lại; ngừng sử dụng giữ tài liệu hiện có và chặn lựa chọn khi đăng mới. Môi trường MongoDB cần replica set hoặc sharded cluster; kết nối hiện tại đã được kiểm tra hỗ trợ giao dịch.
+- `frontend/src/components/Pagination.jsx` dùng chung cho học phần, kho tài liệu quản trị và thư viện. Truyền `page`, `total`, `pageSize`, `onPageChange`; có thể thêm `totalPages` cho API phân trang và `onPageSizeChange` để chọn số mục. Học phần mặc định 12 mục/trang, tùy chọn 24/48; nút Trước/Sau có mũi tên, số trang đang chọn nổi bật và có dấu ba chấm khi nhiều trang.
+- Kiểm tra: backend 32 bài, frontend 5 bài; lint/build đạt. Kiểm tra trình duyệt bằng API giả lập gồm thêm/sửa/xóa, lỗi trùng tên, bảo vệ học phần có tài liệu, lọc và đổi trang, phân quyền giao diện, font thực tế, màn hình 320–1440px. Các thao tác ghi trong kiểm tra trình duyệt chỉ thay đổi dữ liệu thử trong bộ nhớ.

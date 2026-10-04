@@ -26,5 +26,7 @@ router.put("/documents/:id", authorizeRoles("admin"), adminController.updateDocu
 router.delete("/documents/:id", authorizeRoles("admin"), adminController.deleteDocument);
 router.get("/subjects", authorizeRoles("admin", "moderator"), subjectController.getAdminSubjects);
 router.post("/subjects", authorizeRoles("admin"), subjectController.createSubject);
+router.put("/subjects/:id", authorizeRoles("admin"), subjectController.updateSubject);
+router.delete("/subjects/:id", authorizeRoles("admin"), subjectController.deleteSubject);
 
 module.exports = router;

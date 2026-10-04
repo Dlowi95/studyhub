@@ -1,8 +1,8 @@
+import { API_URL } from "@/lib/api";
 import { useEffect, useId, useRef, useState } from 'react';
 import { ArrowUpRight, BookOpen, Clock3, FileText, LoaderCircle, Search, X } from 'lucide-react';
 import { clearSearchHistory, readSearchHistory, rememberSearch, searchRequestParams } from '@/lib/library-search';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export default function SearchAutocomplete({ value, onChange, onSubmit, onSelectSubject, onSelectDocument, filters, popularSubjects = [], variant = 'library', label }) {
   const id = useId();
@@ -19,7 +19,7 @@ export default function SearchAutocomplete({ value, onChange, onSubmit, onSelect
   const pending = focused && query.length >= 2 && !matchingResponse;
   const entries = query.length === 0
     ? [...history.map(text => ({ kind: 'history', title: text })), ...popularSubjects.slice(0, 3).map(name => ({ kind: 'subject', title: name }))]
-    : matchingResponse ? [...response.subjects.map(subject => ({ kind: 'subject', title: subject.name, subtitle: `${subject.count} tài liệu phù hợp` })), ...response.documents.map(doc => ({ kind: 'document', title: doc.title, subtitle: `${doc.subjectName || 'Khác'} · ${doc.fileType}`, id: doc._id }))] : [];
+    : matchingResponse ? [...response.subjects.map(subject => ({ kind: 'subject', title: subject.name, subtitle: `${subject.count} tài liệu phù hợp` })), ...response.documents.map(doc => ({ kind: 'document', title: doc.title, subtitle: `${doc.subjectName || 'Khác'} · ${(doc.availableFormats || [doc.fileType]).join(' / ')}`, id: doc._id }))] : [];
   const open = focused && !dismissed && (query.length === 0 || query.length >= 2);
   const selected = activeIndex >= 0 ? entries[activeIndex] : null;
 

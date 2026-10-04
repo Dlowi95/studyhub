@@ -1,3 +1,4 @@
+import { API_URL } from "@/lib/api";
 import PageHeading from "@/components/PageHeading";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -15,7 +16,6 @@ import {
   ExternalLink,
 } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const STATUS_CONFIG = {
   pending: {

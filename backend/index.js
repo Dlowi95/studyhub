@@ -14,6 +14,7 @@ const subjectRoutes = require("./routes/subjectRoutes");
 const reportRoutes = require("./routes/reportRoutes");   
 const reviewRoutes = require("./routes/reviewRoutes");   
 const notificationRoutes = require("./routes/notificationRoutes");
+const followRoutes = require("./routes/followRoutes");
 const fileRoutes = require("./routes/fileRoutes");
 const bookmarkRoutes = require("./routes/bookmarkRoutes");
 
@@ -57,6 +58,7 @@ app.use("/api/files", fileRoutes);
 app.use("/api", reportRoutes);   
 app.use("/api", reviewRoutes);
 app.use("/api", notificationRoutes);
+app.use("/api/follows", followRoutes);
 app.use("/api", bookmarkRoutes);
 
 // Base route

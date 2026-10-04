@@ -1,3 +1,4 @@
+import { API_URL } from "@/lib/api";
 import { useEffect, useState } from "react";
 import {
   AlertCircle,
@@ -10,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { normalizeFileUrl } from "@/lib/file-url";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const SAFE_PREVIEW_FORMATS = new Set(["pdf", "txt", "docx", "pptx", "xlsx"]);
 const LEGACY_OFFICE_FORMATS = new Set(["doc", "ppt", "xls"]);
 

@@ -1,9 +1,11 @@
+import { API_URL } from "@/lib/api";
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import DocumentDetailActions from "@/components/DocumentDetailActions";
 import DocumentDetailHeader from "@/components/DocumentDetailHeader";
 import DocumentDetailMeta from "@/components/DocumentDetailMeta";
 import DocumentDetailReviews from "@/components/DocumentDetailReviews";
+import DocumentVariantSelector from "@/components/DocumentVariantSelector";
 import DocumentPreview from "@/components/DocumentPreview";
 import ReportModal from "@/components/ReportModal";
 import { Button } from "@/components/ui/button";
@@ -14,11 +16,10 @@ import {
   ChevronRight,
   FileText,
   AlertTriangle,
-  CheckCircle2,
   ExternalLink,
 } from "lucide-react";
 
-const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const apiUrl = API_URL;
 
 const repairFileNameEncoding = (fileName) => {
   if (typeof fileName !== "string" || !/[ÃÂâ]/.test(fileName)) return fileName;
@@ -42,6 +43,7 @@ const normalizeDocument = (doc) => ({
   uploader: doc.uploaderId?.name || doc.uploader || "Thành viên StudyHub",
   isVerified: doc.status === "approved",
   size: doc.fileName ? `${Math.max(1, Math.round((doc.fileSize || 2) / 1024 / 1024))} MB` : "2 MB",
+  fileSize: doc.fileSize || 0,
   fileUrl: doc.fileUrl,
   fileName: repairFileNameEncoding(doc.fileName),
   description: doc.description || "",
@@ -55,15 +57,26 @@ const normalizeDocument = (doc) => ({
   fileAvailable: doc.fileAvailable,
   fileIssue: doc.fileIssue || "",
   storageProvider: doc.storageProvider || "",
+  variantGroupId: doc.variantGroupId,
+  resourceGroupId: doc.resourceGroupId || doc.variantGroupId || doc._id || doc.id,
+  variantCount: doc.variantCount || 1,
+  availableFormats: doc.availableFormats || [doc.fileType || "FILE"],
 });
+
+const normalizeLessonTitle = (title = "") => String(title)
+  .normalize("NFC")
+  .trim()
+  .replace(/[_\s]+/g, " ")
+  .toLocaleLowerCase("vi-VN");
 
 export default function DocumentDetailPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { toast } = useToast();
 
   const [doc, setDoc] = useState(null);
   const [relatedDocs, setRelatedDocs] = useState([]);
+  const [variants, setVariants] = useState([]);
+  const [selectedVariantId, setSelectedVariantId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [avgRating, setAvgRating] = useState(null);
@@ -112,6 +125,21 @@ export default function DocumentDetailPage() {
 
         const normalizedDoc = normalizeDocument(detailData);
         setDoc(normalizedDoc);
+        setSelectedVariantId(String(normalizedDoc.id));
+        setVariants([]);
+        try {
+          const variantsResponse = await fetch(`${apiUrl}/documents/${id}/variants`);
+          if (variantsResponse.ok) {
+            const variantsData = await variantsResponse.json();
+            const normalizedVariants = Array.isArray(variantsData.variants)
+              ? variantsData.variants.map(normalizeDocument)
+              : [normalizedDoc];
+            setVariants(normalizedVariants);
+            setSelectedVariantId(String(normalizedDoc.id));
+          } else setVariants([normalizedDoc]);
+        } catch {
+          setVariants([normalizedDoc]);
+        }
         setAvgRating(normalizedDoc.avgRating);
         void fetch(`${apiUrl}/documents/${id}/view`, { method: "POST", headers: interactionHeaders() }).catch(() => {});
         setFileAvailability({
@@ -147,7 +175,11 @@ export default function DocumentDetailPage() {
             setRelatedDocs(
               relatedData.items
                 .map(normalizeDocument)
-                .filter((item) => item.id !== normalizedDoc.id && item.fileAvailable !== false)
+                .filter((item) => (
+                  item.resourceGroupId !== normalizedDoc.resourceGroupId
+                  && normalizeLessonTitle(item.title) !== normalizeLessonTitle(normalizedDoc.title)
+                  && item.fileAvailable !== false
+                ))
                 .slice(0, 3)
             );
           }
@@ -163,8 +195,60 @@ export default function DocumentDetailPage() {
   }, [id]);
 
   const handleAvailabilityChange = useCallback((nextStatus) => {
-    setFileAvailability(nextStatus);
-  }, []);
+    const message = nextStatus.message || "";
+    setFileAvailability((previous) => (
+      previous.state === nextStatus.state && previous.message === message
+        ? previous
+        : { state: nextStatus.state, message }
+    ));
+
+    // "checking" is only a preview UI state. Writing it back to the document
+    // creates a new `document` prop, which restarts DocumentPreview's effect
+    // and can trigger an endless stream of preview requests.
+    if (nextStatus.state === "checking") return;
+
+    const available = nextStatus.state !== "missing";
+    setDoc((previous) => {
+      if (String(previous?.id) !== String(selectedVariantId)) return previous;
+      if (previous.fileAvailable === available && previous.fileIssue === message) return previous;
+      return { ...previous, fileAvailable: available, fileIssue: message };
+    });
+    setVariants((previous) => {
+      let changed = false;
+      const updated = previous.map((variant) => {
+        if (String(variant.id) !== String(selectedVariantId)) return variant;
+        if (variant.fileAvailable === available && variant.fileIssue === message) return variant;
+        changed = true;
+        return { ...variant, fileAvailable: available, fileIssue: message };
+      });
+      return changed ? updated : previous;
+    });
+  }, [selectedVariantId]);
+
+  const selectedVariant = variants.find((variant) => String(variant.id) === String(selectedVariantId));
+  const activeDoc = selectedVariant || doc;
+  const handleSelectVariant = (variant) => {
+    setSelectedVariantId(String(variant.id));
+    setAvgRating(variant.avgRating || 0);
+    setFileAvailability({
+      state: variant.fileAvailable === false ? "missing" : "checking",
+      message: variant.fileIssue || "",
+    });
+    setHasReported(false);
+    setReportStatus(null);
+    const token = localStorage.getItem("token");
+    if (token) {
+      fetch(`${apiUrl}/reports/check/${variant.id}`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((response) => response.ok ? response.json() : null)
+        .then((data) => {
+          if (data) {
+            setHasReported(Boolean(data.hasReported));
+            setReportStatus(data.status || null);
+          }
+        })
+        .catch(() => {});
+    }
+  };
 
   const handleDownload = async (docItem) => {
     if (!docItem?.fileUrl || isDownloading) return;
@@ -246,13 +330,16 @@ export default function DocumentDetailPage() {
       if (counterResponse.ok) {
         const counterData = await counterResponse.json();
         setDoc((prev) =>
-          prev
+          prev && prev.id === docItem.id
             ? {
                 ...prev,
                 downloadCount: counterData.document?.downloadCount ?? (prev.downloadCount || 0) + 1,
               }
             : prev
         );
+        setVariants((previous) => previous.map((variant) => variant.id === docItem.id
+          ? { ...variant, downloadCount: counterData.document?.downloadCount ?? (variant.downloadCount || 0) + 1 }
+          : variant));
       }
     } catch {
       // A counter failure must not block a completed file download.
@@ -265,7 +352,7 @@ export default function DocumentDetailPage() {
     setIsDownloading(false);
   };
 
-  const fileUnavailable = doc?.fileAvailable === false || fileAvailability.state === "missing";
+  const fileUnavailable = activeDoc?.fileAvailable === false || fileAvailability.state === "missing";
 
   if (loading) {
     return (
@@ -311,57 +398,21 @@ export default function DocumentDetailPage() {
         <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         <span className="text-muted-foreground whitespace-nowrap">Học phần</span>
         <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-        <span className="font-semibold text-foreground whitespace-nowrap">
+        <Link to={`/subjects/${encodeURIComponent(doc.subjectName || "Khác")}`} className="font-semibold text-foreground whitespace-nowrap hover:text-primary">
           {doc.subjectName || "Khác"}
-        </span>
+        </Link>
         <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         <span className="text-muted-foreground truncate max-w-[200px]">{doc.title}</span>
       </nav>
 
       {/* 2. DOCUMENT STATUS BANNER */}
-      <div
-        className={`rounded-2xl border p-3.5 px-4 flex items-center justify-between gap-3 shadow-xs ${
-          fileUnavailable
-            ? "border-warning/90 bg-warning/10 "
-            : "border-primary/90 bg-primary/10 "
-        }`}
-      >
+      {fileUnavailable && <div className="flex items-center justify-between gap-3 rounded-2xl border border-warning/90 bg-warning/10 p-3.5 px-4 shadow-xs">
         <div className="flex items-center gap-2.5">
-          <div
-            className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border ${
-              fileUnavailable
-                ? "border-warning bg-warning/10 text-warning "
-                : "border-primary/80 bg-primary/10 text-primary "
-            }`}
-          >
-            {fileUnavailable ? (
-              <AlertTriangle className="w-4 h-4" />
-            ) : (
-              <CheckCircle2 className="w-4 h-4" />
-            )}
-          </div>
-          <p
-            className={`text-xs font-medium ${
-              fileUnavailable
-                ? "text-warning "
-                : "text-primary "
-            }`}
-          >
-            {fileUnavailable
-              ? "Nội dung đã từng được duyệt, nhưng tệp nguồn hiện không còn khả dụng."
-              : "Nội dung đã được duyệt — Bạn có thể xem trước để chọn đúng tài liệu."}
-          </p>
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-warning bg-warning/10 text-warning"><AlertTriangle className="h-4 w-4" /></span>
+          <p className="text-xs font-medium text-warning">Nội dung đã từng được duyệt, nhưng tệp nguồn hiện không còn khả dụng.</p>
         </div>
-        <span
-          className={`hidden sm:inline-block text-[11px] font-semibold bg-card  px-2.5 py-1 rounded-lg border shadow-2xs whitespace-nowrap ${
-            fileUnavailable
-              ? "border-warning/80 text-warning "
-              : "border-primary/80 text-primary "
-          }`}
-        >
-          {fileUnavailable ? "Cần tải lại tệp" : "Đã xác thực"}
-        </span>
-      </div>
+        <span className="hidden whitespace-nowrap rounded-lg border border-warning/80 bg-card px-2.5 py-1 text-[11px] font-semibold text-warning shadow-2xs sm:inline-block">Cần tải lại tệp</span>
+      </div>}
 
       {/* 3. MAIN 2-COLUMN BENTO GRID */}
       <div className="detail-grid">
@@ -369,20 +420,22 @@ export default function DocumentDetailPage() {
         <div className="detail-main">
           {/* Header Card */}
           <div className="detail-info paper-panel p-5 md:p-8 space-y-6">
-            <DocumentDetailHeader doc={doc} />
+            <DocumentDetailHeader doc={activeDoc} />
+
+            <DocumentVariantSelector variants={variants} selectedId={activeDoc.id} onSelect={handleSelectVariant} />
 
             {/* Document Description */}
             <div className="rounded-2xl border border-border bg-muted/70 p-5 space-y-2">
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground ">
                 Thông tin & Giới thiệu tài liệu
               </span>
-              <p className="text-xs md:text-sm leading-relaxed text-foreground whitespace-pre-line">
+              <p className="text-sm leading-relaxed text-foreground whitespace-pre-line [overflow-wrap:anywhere]">
                 {doc.description ? doc.description : "Tài liệu này chưa có phần mô tả chi tiết."}
               </p>
             </div>
 
             {/* Document Meta KPI Cards */}
-            <DocumentDetailMeta doc={doc} />
+              <DocumentDetailMeta doc={activeDoc} />
           </div>
 
           {/* Interactive Document Preview Box */}
@@ -395,14 +448,14 @@ export default function DocumentDetailPage() {
                 </h3>
               </div>
 
-              {doc.fileUrl && (
+              {activeDoc.fileUrl && (
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={fileUnavailable}
                   onClick={() => {
                     if (!fileUnavailable) {
-                      window.open(normalizeFileUrl(doc.fileUrl), "_blank", "noopener,noreferrer");
+                      window.open(normalizeFileUrl(activeDoc.fileUrl), "_blank", "noopener,noreferrer");
                     }
                   }}
                   className="rounded-xl border-border text-xs font-semibold gap-1.5 h-8 hover:bg-muted "
@@ -414,22 +467,24 @@ export default function DocumentDetailPage() {
             </div>
 
             <DocumentPreview
-              document={doc}
+              key={activeDoc.id}
+              document={activeDoc}
               onDownload={handleDownload}
               onAvailabilityChange={handleAvailabilityChange}
             />
           </div>
 
           {/* Reviews & Ratings Section (Real Data) */}
-          {doc.status === "approved" && (
+          {activeDoc.status === "approved" && (
             <div className="detail-reviews">
             <DocumentDetailReviews
-              documentId={doc.id}
+              documentId={activeDoc.id}
               avgRating={avgRating}
-              key={doc.id}
+              key={activeDoc.id}
               onAvgRatingChange={(newAvg) => {
                 setAvgRating(newAvg);
-                setDoc((previous) => ({ ...previous, avgRating: newAvg }));
+                setDoc((previous) => previous?.id === activeDoc.id ? { ...previous, avgRating: newAvg } : previous);
+                setVariants((previous) => previous.map((variant) => variant.id === activeDoc.id ? { ...variant, avgRating: newAvg } : variant));
               }}
             />
             </div>
@@ -454,49 +509,33 @@ export default function DocumentDetailPage() {
 
             <div className="p-5">
               <DocumentDetailActions
-                doc={doc}
+                doc={activeDoc}
                 onDownload={handleDownload}
                 isDownloading={isDownloading}
                 onReport={openReportModal}
                 hasReported={hasReported}
                 reportStatus={reportStatus}
                 fileUnavailable={fileUnavailable}
-                fileIssue={fileAvailability.message || doc.fileIssue}
+                fileIssue={fileAvailability.message || activeDoc.fileIssue}
               />
             </div>
           </div>
 
           {/* Related Documents in Subject */}
-          {relatedDocs.length > 0 && (
-            <div className="rounded-3xl border border-border/80 bg-card p-6 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-border pb-3">
-                <h3 className="text-sm font-bold text-foreground ">Tài liệu cùng học phần</h3>
-                <span className="text-xs text-muted-foreground font-medium">
-                  {relatedDocs.length} tài liệu
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                {relatedDocs.map((item) => (
-                  <div
-                    key={item.id}
-                    onClick={() => navigate(`/document/${item.id}`)}
-                    className="p-3 rounded-2xl border border-border/60 bg-muted/50 hover:bg-card hover:border-primary/40 hover:shadow-xs transition-all cursor-pointer space-y-1.5"
-                  >
-                    <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-semibold">
-                      {item.subjectName || "Học phần"}
-                    </span>
-                    <h4 className="text-xs font-bold text-foreground line-clamp-2 hover:text-primary transition-colors">
-                      {item.title}
-                    </h4>
-                    <p className="text-[10px] text-muted-foreground ">
-                      {item.downloadCount || 0} lượt tải • {item.type}
-                    </p>
-                  </div>
-                ))}
-              </div>
+          <div className="related-lessons-card rounded-3xl border border-border/80 bg-card p-6 shadow-xs space-y-4">
+            <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+              <h3 className="text-sm font-bold text-foreground">Bài giảng cùng học phần</h3>
+              <Link to={`/subjects/${encodeURIComponent(activeDoc.subjectName || "Khác")}`} className="shrink-0 text-xs font-semibold text-primary hover:underline">Xem tất cả <span aria-hidden="true">→</span></Link>
             </div>
-          )}
+
+            {relatedDocs.length ? <div className="related-lessons-list space-y-3">
+              {relatedDocs.map((item) => <Link key={item.id} to={`/document/${item.id}`} className="block space-y-1.5 rounded-2xl border border-border/60 bg-muted/50 p-3 transition-all hover:border-primary/40 hover:bg-card hover:shadow-xs">
+                <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">{item.subjectName || "Học phần"}</span>
+                <h4 className="line-clamp-2 text-xs font-bold text-foreground transition-colors hover:text-primary">{item.title}</h4>
+                <p className="text-[10px] text-muted-foreground">{item.downloadCount || 0} lượt tải · {item.type}</p>
+              </Link>)}
+            </div> : <p className="text-xs text-muted-foreground">Chưa có bài giảng liên quan khác. Anh có thể xem danh sách đầy đủ của học phần.</p>}
+          </div>
         </div>
       </div>
 

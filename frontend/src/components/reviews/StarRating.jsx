@@ -15,7 +15,7 @@ export default function StarRating({
   const stars = [1, 2, 3, 4, 5];
 
   return (
-    <div className="flex items-center gap-0.5" role={interactive ? "radiogroup" : "img"}
+    <div className="flex items-center gap-1" role={interactive ? "group" : "img"}
       aria-label={interactive ? "Chọn số sao đánh giá" : `Đánh giá ${value} trên 5 sao`}>
       {stars.map((star) => {
         const filled = star <= Math.round(value);
@@ -26,10 +26,11 @@ export default function StarRating({
             disabled={!interactive}
             onClick={() => interactive && onChange?.(star)}
             className={cn(
-              "transition-colors",
+              "star-rating-item transition-transform",
               interactive ? "cursor-pointer hover:scale-110" : "cursor-default"
             )}
             aria-label={`${star} sao`}
+            aria-pressed={interactive ? star === Math.round(value) : undefined}
           >
             <Star
               size={size}

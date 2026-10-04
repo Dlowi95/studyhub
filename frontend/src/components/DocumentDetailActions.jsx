@@ -1,3 +1,4 @@
+import { API_URL } from "@/lib/api";
 import { useState, useEffect } from "react";
 import { Download, FileText, MessageSquareWarning, Bookmark, Share2, Check, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ export default function DocumentDetailActions({
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const apiUrl = API_URL;
 
   useEffect(() => {
     if (!doc?.id) return;

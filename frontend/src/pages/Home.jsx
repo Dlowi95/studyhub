@@ -1,6 +1,7 @@
+import { API_URL } from "@/lib/api";
 import { useCallback, useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
-import { Search, BookOpen, UploadCloud, ChevronDown, HelpCircle, ShieldCheck, Users2, ArrowUpRight, Monitor, FileText } from "lucide-react";
+import { Search, BookOpen, UploadCloud, ChevronDown, HelpCircle, ShieldCheck, Users2, ArrowUpDown, ArrowUpRight, Monitor, FileText } from "lucide-react";
 import DocumentCard from "@/components/DocumentCard";
 import SubjectFilter from "@/components/SubjectFilter";
 import ReportModal from "@/components/ReportModal";
@@ -8,15 +9,17 @@ import UploadModal from "@/components/UploadModal";
 import StudyArtwork from "@/components/StudyArtwork";
 import SearchAutocomplete from "@/components/SearchAutocomplete";
 import AdvancedSearch from "@/components/AdvancedSearch";
+import Pagination from "@/components/Pagination";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { readSearchParams, updateSearchParams, searchRequestParams, SEARCH_DEFAULTS } from "@/lib/library-search";
 import { interactionHeaders } from "@/lib/interaction";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const normalizeDocument = (doc) => ({
   id: doc._id || doc.id,
   title: doc.title || "Tài liệu chưa có tiêu đề",
   subject: doc.subjectName || doc.subjectId?.name || "Khác",
+  views: doc.viewCount || 0,
   downloads: doc.downloadCount || 0,
   rating: doc.avgRating || 0,
   type: (doc.fileType || "PDF").toString().toUpperCase(),
@@ -27,6 +30,8 @@ const normalizeDocument = (doc) => ({
   createdAt: doc.createdAt,
   fileAvailable: doc.fileAvailable,
   fileIssue: doc.fileIssue || "",
+  variantCount: doc.variantCount || 1,
+  availableFormats: doc.availableFormats || [doc.fileType || "FILE"],
 });
 
 export default function Home({ onOpenAuth, user }) {
@@ -173,8 +178,8 @@ export default function Home({ onOpenAuth, user }) {
   }, [catalog]);
 
   const totalDownloadsCount = summary ? (summary.totalDownloads || 0).toLocaleString("vi-VN") : "—";
-  const totalDocumentsCount = summary ? (summary.approved || 0).toLocaleString("vi-VN") : "—";
-  const totalSubjectsCount = summary ? (summary.totalSubjects || 0).toLocaleString("vi-VN") : "—";
+  const totalDocumentsCount = summary ? (summary.approvedResources ?? summary.approved ?? 0).toLocaleString("vi-VN") : "—";
+  const totalSubjectsCount = catalog.length.toLocaleString("vi-VN");
 
   const platformStats = [
     { value: totalDocumentsCount, label: "Tài liệu đã duyệt" },
@@ -229,8 +234,8 @@ export default function Home({ onOpenAuth, user }) {
       </section>
 
       <section className="home-subjects" id="subjects">
-        <div className="section-heading"><div><p className="section-eyebrow">BẮT ĐẦU TỪ MÔN HỌC CỦA BẠN</p><h2>Hôm nay bạn học gì?</h2></div><a href="#featured" className="text-link">Tất cả học phần<ArrowUpRight size={18} /></a></div>
-        <div className="subject-grid">{catalog.filter((subject) => subject.name !== "Khác").sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, 6).map((subject, index) => <button key={subject.id || subject.name} type="button" className={`subject-tile subject-tone-${index % 3}`} onClick={() => { handleSelectSubjectShowcase(subject.name); }}><span className="subject-tile-index">{String(index + 1).padStart(2, "0")}</span><div><h3>{subject.name}</h3><span>{subject.count || 0} tài liệu đã duyệt</span></div><ArrowUpRight size={20} /></button>)}</div>
+        <div className="section-heading"><div><p className="section-eyebrow">BẮT ĐẦU TỪ MÔN HỌC CỦA BẠN</p><h2>Hôm nay bạn học gì?</h2></div><button type="button" className="text-link cursor-pointer border-0 bg-transparent p-0" onClick={() => navigate("/subjects")}>Tất cả học phần<ArrowUpRight size={18} /></button></div>
+        <div className="subject-grid">{catalog.filter((subject) => subject.name !== "Khác").slice(0, 6).map((subject, index) => <button key={subject.id || subject.name} type="button" className={`subject-tile subject-tone-${index % 3}`} onClick={() => navigate(`/subjects/${encodeURIComponent(subject.name)}`)}><span className="subject-tile-index">{String(index + 1).padStart(2, "0")}</span><div><h3>{subject.name}</h3><span>{subject.count || 0} tài liệu đã duyệt</span></div><ArrowUpRight size={20} /></button>)}</div>
       </section>
 
       <section className="home-library" id="featured" aria-labelledby="library-title">
@@ -239,12 +244,12 @@ export default function Home({ onOpenAuth, user }) {
           <SubjectFilter subjects={subjects} selectedSubject={selectedSubject} onSelectSubject={setSelectedSubject} />
           <div className="library-search-sort">
             <SearchAutocomplete label="Tìm trong thư viện" value={searchQuery} onChange={setSearchQuery} filters={filters} popularSubjects={searchSuggestions} onSelectSubject={handleSelectSubjectShowcase} onSelectDocument={id => handleViewDoc({ id })} onSubmit={() => document.getElementById('featured')?.scrollIntoView({ behavior: 'smooth' })} />
-            <label className="library-sort"><span>SẮP XẾP</span><select aria-label="Sắp xếp tài liệu" value={sortBy} onChange={event => updateSearch({ sort: event.target.value })}><option value="latest">Mới nhất</option><option value="popular">Tải nhiều nhất</option><option value="rating">Đánh giá cao</option></select></label>
+            <div className="library-sort"><span>Sắp xếp</span><div className="library-sort-control"><ArrowUpDown size={16} aria-hidden="true" /><Select value={sortBy} onValueChange={value => updateSearch({ sort: value })}><SelectTrigger aria-label="Sắp xếp tài liệu" className="library-sort-trigger"><SelectValue /></SelectTrigger><SelectContent className="library-sort-menu"><SelectItem value="latest">Mới nhất</SelectItem><SelectItem value="popular">Tải nhiều nhất</SelectItem><SelectItem value="rating">Đánh giá cao</SelectItem></SelectContent></Select></div></div>
           </div>
           <AdvancedSearch key={JSON.stringify({ ...filters, q: '', sort: '' })} filters={filters} subjects={catalog.map(subject => subject.name)} onApply={updateSearch} />
         </div>
         {isSearching ? <div className="document-grid">{[1, 2, 3, 4].map((item) => <div className="document-skeleton" key={item}><div /><span /><span /></div>)}</div> : documentError ? <div className="paper-empty" role="alert"><FileText size={35} /><h3>Thư viện chưa tải được</h3><p>{documentError}</p><button type="button" className="paper-button" onClick={() => setReloadKey((key) => key + 1)}>Thử lại</button></div> : documents.length > 0 ? <div className="document-grid">{documents.map((doc) => <DocumentCard key={doc.id} doc={doc} onReport={handleReportClick} onView={handleViewDoc} />)}</div> : <div className="paper-empty"><Search size={35} /><h3>Chưa tìm thấy tài liệu phù hợp</h3><p>Thử một từ khóa khác hoặc chọn học phần khác nhé.</p><div><button type="button" className="paper-button" onClick={clearFilters}>Xóa bộ lọc</button><button type="button" className="paper-button paper-button-primary" onClick={handleUploadClick}>Đóng góp tài liệu</button></div></div>}
-        {!isSearching && !documentError && pagination.totalPages > 1 && <nav aria-label="Phân trang tài liệu" className="paper-pagination"><button type="button" className="paper-button" disabled={page <= 1} onClick={() => { updateSearch({ page: page - 1 }); document.getElementById("featured")?.scrollIntoView({ behavior: "smooth" }); }}>Trang trước</button><span>Trang {page} / {pagination.totalPages}</span><button type="button" className="paper-button" disabled={page >= pagination.totalPages} onClick={() => { updateSearch({ page: page + 1 }); document.getElementById("featured")?.scrollIntoView({ behavior: "smooth" }); }}>Trang sau</button></nav>}
+        {!isSearching && !documentError && pagination.total > 0 && <Pagination label="Phân trang thư viện" itemLabel="tài liệu" page={page} total={pagination.total} totalPages={pagination.totalPages} pageSize={12} onPageChange={nextPage => { updateSearch({ page: nextPage }); document.getElementById("featured")?.scrollIntoView({ behavior: "smooth" }); }} />}
       </section>
 
       <section className="home-contribute"><div><span className="sticker sticker-cream">KIẾN THỨC LỚN LÊN KHI ĐƯỢC CHIA SẺ</span><h2>Bạn có tài liệu hay?<br />Đừng giữ cho riêng mình.</h2><p>Đề cương, ghi chú hay bài giảng — đóng góp nhỏ, giúp ích nhiều.</p><button type="button" className="paper-button paper-button-primary" onClick={handleUploadClick}><UploadCloud size={19} /> Chia sẻ tài liệu<ArrowUpRight size={18} /></button></div><div className="contribute-doodle" aria-hidden="true"><BookOpen size={115} strokeWidth={1.1} /><span>cùng học tốt hơn!</span><span className="contribute-star">✳</span></div></section>

@@ -1,17 +1,17 @@
+import { API_URL } from "@/lib/api";
 import { clearAccountSession } from "@/lib/session";
 import PageHeading from "@/components/PageHeading";
-import { useEffect, useState, useMemo, useRef } from "react";
+import Pagination from "@/components/Pagination";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   User,
-  Mail,
   Shield,
   ShieldCheck,
   ShieldAlert,
-  Calendar,
   UploadCloud,
   Bookmark,
   Download,
@@ -37,6 +37,11 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [docsLoading, setDocsLoading] = useState(true);
   const [documents, setDocuments] = useState([]);
+  const [documentsSummary, setDocumentsSummary] = useState({ total: 0, approved: 0, pending: 0, rejected: 0, totalViews: 0, totalDownloads: 0 });
+  const [documentsPage, setDocumentsPage] = useState(1);
+  const [documentsPagination, setDocumentsPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
+  const [documentsReloadKey, setDocumentsReloadKey] = useState(0);
+  const documentsRequestRef = useRef(0);
   const [activeTab, setActiveTab] = useState("uploads"); // "uploads" | "saved" | "downloads" | "account"
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // "all" | "approved" | "pending" | "rejected"
@@ -53,10 +58,11 @@ export default function Profile() {
   // Saved bookmarks and download history from local storage
   const [savedDocs, setSavedDocs] = useState([]);
   const [downloadHistory, setDownloadHistory] = useState([]);
+  const [followSummary, setFollowSummary] = useState({ followers: 0, following: 0 });
 
   const navigate = useNavigate();
   const { toast } = useToast();
-  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const apiUrl = API_URL;
 
   // 1. Fetch User Profile
   const fetchProfile = async () => {
@@ -98,24 +104,38 @@ export default function Profile() {
   };
 
   // 2. Fetch User's Real Uploaded Documents
-  const fetchMyDocuments = async () => {
+  const fetchMyDocuments = async ({ page, query, status, requestId }) => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
     setDocsLoading(true);
     try {
-      const response = await fetch(`${apiUrl}/documents/my`, {
+      const params = new URLSearchParams({ page: String(page), limit: "10", q: query, status });
+      const response = await fetch(`${apiUrl}/documents/my?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (response.ok) {
         const data = await response.json();
-        setDocuments(data.documents || []);
+        if (documentsRequestRef.current !== requestId) return;
+        setDocuments(Array.isArray(data.documents) ? data.documents : []);
+        setDocumentsSummary(data.summary || { total: data.count || 0, approved: 0, pending: 0, rejected: 0, totalViews: 0, totalDownloads: 0 });
+        const nextPage = Number(data.page) || 1;
+        setDocumentsPage(nextPage);
+        setDocumentsPagination({
+          page: nextPage,
+          limit: Number(data.limit) || 10,
+          total: Number(data.count) || 0,
+          totalPages: Number(data.totalPages) || 0,
+        });
+      } else if (documentsRequestRef.current === requestId) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "Không thể tải tài liệu của bạn");
       }
     } catch (err) {
-      console.error("Error fetching user documents:", err);
+      if (documentsRequestRef.current === requestId) console.error("Error fetching user documents:", err);
     } finally {
-      setDocsLoading(false);
+      if (documentsRequestRef.current === requestId) setDocsLoading(false);
     }
   };
 
@@ -153,16 +173,32 @@ export default function Profile() {
     }
   };
 
+  const fetchFollowSummary = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      const response = await fetch(`${apiUrl}/follows/me/summary`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      setFollowSummary({ followers: Number(data.followers) || 0, following: Number(data.following) || 0 });
+    } catch (error) {
+      console.error("Không thể tải thống kê theo dõi:", error);
+    }
+  };
+
   useEffect(() => {
     queueMicrotask(() => {
       void fetchProfile();
-      void fetchMyDocuments();
       void loadLocalActivity();
+      void fetchFollowSummary();
     });
 
     // Listen for custom event if new upload happens
     const handleDocUploaded = () => {
-      fetchMyDocuments();
+      setDocumentsPage(1);
+      setDocumentsReloadKey((key) => key + 1);
     };
     window.addEventListener("documentUploaded", handleDocUploaded);
     window.addEventListener("bookmarksChanged", loadLocalActivity);
@@ -173,6 +209,19 @@ export default function Profile() {
     // These loaders are intentionally run once when the profile mounts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
+
+  useEffect(() => {
+    const requestId = ++documentsRequestRef.current;
+    const timer = window.setTimeout(() => {
+      void fetchMyDocuments({ page: documentsPage, query: searchQuery, status: statusFilter, requestId });
+    }, searchQuery ? 250 : 0);
+    return () => {
+      window.clearTimeout(timer);
+      if (documentsRequestRef.current === requestId) documentsRequestRef.current += 1;
+    };
+    // This effect intentionally requests the current server-side filter/page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentsPage, searchQuery, statusFilter, documentsReloadKey]);
 
   const handleLogout = () => {
     clearAccountSession();
@@ -323,8 +372,8 @@ export default function Profile() {
       }
 
       if (res.ok) {
-        setDocuments((prev) => prev.filter((doc) => doc._id !== id));
         setDeleteConfirmId(null);
+        setDocumentsReloadKey((key) => key + 1);
         toast({
           title: "Đã xoá tài liệu",
           description: "Tài liệu đã được xoá thành công khỏi kho lưu trữ.",
@@ -351,33 +400,8 @@ export default function Profile() {
     window.dispatchEvent(new Event("openUploadModal"));
   };
 
-  // Real-time KPI Stats computed from real MongoDB docs
-  const stats = useMemo(() => {
-    const total = documents.length;
-    const approved = documents.filter((d) => d.status === "approved").length;
-    const pending = documents.filter((d) => d.status === "pending").length;
-    const rejected = documents.filter((d) => d.status === "rejected").length;
-    const totalViews = documents.reduce((sum, d) => sum + (d.viewCount || 0), 0);
-    const totalDownloads = documents.reduce((sum, d) => sum + (d.downloadCount || 0), 0);
-
-    return { total, approved, pending, rejected, totalViews, totalDownloads };
-  }, [documents]);
-
-  // Filtered documents
-  const filteredDocuments = useMemo(() => {
-    return documents.filter((doc) => {
-      const matchesSearch =
-        !searchQuery ||
-        doc.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.subjectName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.tags?.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()));
-
-      const matchesStatus =
-        statusFilter === "all" || doc.status === statusFilter;
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [documents, searchQuery, statusFilter]);
+  const stats = documentsSummary;
+  const filteredDocuments = documents;
 
   if (loading) {
     return (
@@ -391,187 +415,40 @@ export default function Profile() {
   return (
     <div className="profile-page page-shell space-y-7 text-left pb-10">
       <PageHeading eyebrow="GÓC HỌC TẬP CÁ NHÂN" title="Không gian của bạn." description="Quản lý tài liệu đã chia sẻ, theo dõi kiểm duyệt và tìm lại những tài liệu đã lưu." />
-      {/* Profile information */}
-      <div className="profile-summary paper-panel p-5 md:p-8">
-          <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
-          {/* Avatar & User Details */}
-          <div className="flex items-center gap-5">
-            {/* User Avatar with change button */}
-            <div className="relative group shrink-0">
-              <div className="profile-avatar w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden bg-brand-lavender text-foreground font-bold text-3xl flex items-center justify-center border-2 border-primary relative">
-                {avatarUploading ? (
-                  <div className="absolute inset-0 bg-card/60 flex items-center justify-center">
-                    <Loader2 className="w-7 h-7 text-foreground animate-spin" />
-                  </div>
-                ) : user?.avatarUrl ? (
-                  <img
-                    src={user.avatarUrl}
-                    alt={user.name || "Avatar"}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  user?.name ? user.name.charAt(0) : "U"
-                )}
-              </div>
-
-              {/* Camera Button to Change Avatar from File */}
-              <button
-                type="button"
-                onClick={() => avatarInputRef.current?.click()}
-                title="Đổi ảnh đại diện từ máy"
-                disabled={avatarUploading}
-                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground ring-2 ring-background flex items-center justify-center transition-all shadow-sm active:scale-95 cursor-pointer"
-              >
-                <Camera className="w-3.5 h-3.5" />
-              </button>
-
-              <input
-                type="file"
-                ref={avatarInputRef}
-                onChange={handleAvatarChange}
-                accept="image/*"
-                className="hidden"
-              />
+      <div className="profile-layout">
+        <aside className="profile-sidebar paper-panel" aria-label="Quản lý tài khoản">
+          <div className="profile-sidebar-identity">
+            <div className="profile-sidebar-avatar-wrap">
+              <div className="profile-sidebar-avatar">{avatarUploading ? <Loader2 className="h-6 w-6 animate-spin" /> : user?.avatarUrl ? <img src={user.avatarUrl} alt={user.name || "Ảnh đại diện"} referrerPolicy="no-referrer" /> : user?.name?.charAt(0) || "U"}</div>
+              <button type="button" className="profile-avatar-edit" onClick={() => avatarInputRef.current?.click()} disabled={avatarUploading} aria-label="Đổi ảnh đại diện"><Camera size={15} /></button>
+              <input type="file" ref={avatarInputRef} onChange={handleAvatarChange} accept="image/*" className="hidden" />
             </div>
-
-            <div className="space-y-1.5 flex-1 min-w-0">
-              {/* Name (with inline edit) & Role Badge */}
-              <div className="flex items-center gap-2.5 flex-wrap">
-                {isEditingName ? (
-                  <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
-                    <input
-                      type="text"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      className="text-base md:text-lg font-bold text-foreground border border-border rounded-xl px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-card shadow-xs"
-                      autoFocus
-                    />
-                    <Button
-                      size="sm"
-                      onClick={handleSaveName}
-                      disabled={nameSaving}
-                      className="h-8 px-2.5 rounded-lg bg-primary hover:bg-primary text-primary-foreground text-xs font-semibold"
-                    >
-                      {nameSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setIsEditingName(false);
-                        setNewName(user?.name || "");
-                      }}
-                      className="h-8 px-2 rounded-lg text-xs border-border "
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-xl md:text-2xl font-extrabold text-foreground tracking-tight">
-                      {user?.name || "Người dùng StudyHub"}
-                    </h2>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewName(user?.name || "");
-                        setIsEditingName(true);
-                      }}
-                      title="Chỉnh sửa tên"
-                      className="p-1 rounded-lg text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-
-                <Badge
-                  variant="outline"
-                  className={`text-xs px-2.5 py-0.5 font-semibold capitalize rounded-lg ${
-                    user?.role === "admin"
-                      ? "bg-destructive/10 text-destructive border-destructive/80 "
-                      : user?.role === "moderator"
-                      ? "bg-accent/10 text-primary border-primary/80 "
-                      : "bg-primary/10 text-primary border-primary/80 "
-                  }`}
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 mr-1 inline" />
-                  {user?.role === "admin"
-                    ? "Quản trị viên"
-                    : user?.role === "moderator"
-                    ? "Kiểm duyệt viên"
-                    : "Sinh viên"}
-                </Badge>
-              </div>
-
-              <p className="text-xs md:text-sm text-muted-foreground flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5 text-muted-foreground " />
-                {user?.email}
-              </p>
-
-              <div className="flex items-center gap-4 pt-1 text-[11px] md:text-xs text-muted-foreground ">
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-muted-foreground " />
-                  Gia nhập:{" "}
-                  {user?.createdAt
-                    ? new Date(user.createdAt).toLocaleDateString("vi-VN", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "numeric",
-                      })
-                    : "Mới tham gia"}
-                </span>
-              </div>
+            <div className="profile-sidebar-user">
+              {isEditingName ? <div className="profile-name-editor"><input aria-label="Tên hiển thị" value={newName} maxLength={60} onChange={event => setNewName(event.target.value)} autoFocus /><button type="button" onClick={handleSaveName} disabled={nameSaving || !newName.trim()} aria-label="Lưu tên">{nameSaving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}</button><button type="button" onClick={() => { setIsEditingName(false); setNewName(user?.name || ""); }} aria-label="Hủy sửa tên"><X size={15} /></button></div> : <div className="profile-sidebar-name-row"><h2>{user?.name || "Người dùng StudyHub"}</h2><button type="button" onClick={() => { setNewName(user?.name || ""); setIsEditingName(true); }} aria-label="Sửa tên hiển thị"><Pencil size={14} /></button></div>}
+              <p className="profile-sidebar-email">{user?.email}</p>
+              <Badge variant="outline" className="profile-role-badge"><ShieldCheck size={13} />{user?.role === "admin" ? "Quản trị viên" : user?.role === "moderator" ? "Kiểm duyệt viên" : "Sinh viên"}</Badge>
             </div>
           </div>
-
-          {/* Quick Actions */}
-          <div className="flex items-center gap-2.5 flex-wrap self-start md:self-center">
-            <Button
-              onClick={handleOpenUpload}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-xs md:text-sm font-semibold shadow-xs transition-all active:scale-[0.98] gap-1.5"
-            >
-              <UploadCloud className="w-4 h-4" />
-              Đăng tài liệu mới
-            </Button>
-
-            {(user?.role === "admin" || user?.role === "moderator") && (
-              <Link to="/admin">
-                <Button
-                  variant="outline"
-                  className="rounded-xl border-primary bg-primary/10 text-primary hover:bg-primary/10 text-xs md:text-sm font-semibold gap-1.5"
-                >
-                  <Shield className="w-4 h-4 text-primary " />
-                  {user?.role === "admin" ? "Trang Admin" : "Trang Kiểm duyệt"}
-                </Button>
-              </Link>
-            )}
-
-            <Link to="/my-reports">
-              <Button
-                variant="outline"
-                className="rounded-xl border-warning bg-warning/10 text-warning hover:bg-warning/10 text-xs md:text-sm font-semibold gap-1.5 cursor-pointer"
-              >
-                <ShieldAlert className="w-4 h-4 text-warning " />
-                Báo cáo của tôi
-              </Button>
-            </Link>
-
-            <Button
-              onClick={handleLogout}
-              variant="outline"
-              className="rounded-xl border-border text-foreground hover:text-destructive hover:bg-destructive/10 hover:border-destructive text-xs md:text-sm font-semibold transition-all gap-1.5 cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-              Đăng xuất
-            </Button>
+          <nav className="profile-side-nav" aria-label="Các mục hồ sơ">
+            <button type="button" className={activeTab === "account" ? "is-active" : ""} aria-pressed={activeTab === "account"} onClick={() => setActiveTab("account")}><User size={17} /><span>Tài khoản</span></button>
+            <button type="button" className={activeTab === "uploads" ? "is-active" : ""} aria-pressed={activeTab === "uploads"} onClick={() => setActiveTab("uploads")}><FileText size={17} /><span>Tài liệu của tôi</span><span className="profile-nav-count">{stats.total}</span></button>
+            <button type="button" className={activeTab === "saved" ? "is-active" : ""} aria-pressed={activeTab === "saved"} onClick={() => setActiveTab("saved")}><Bookmark size={17} /><span>Đã lưu</span>{savedDocs.length > 0 && <span className="profile-nav-count">{savedDocs.length}</span>}</button>
+            <button type="button" className={activeTab === "downloads" ? "is-active" : ""} aria-pressed={activeTab === "downloads"} onClick={() => setActiveTab("downloads")}><Download size={17} /><span>Đã tải về</span>{downloadHistory.length > 0 && <span className="profile-nav-count">{downloadHistory.length}</span>}</button>
+            <Link to="/my-reports"><ShieldAlert size={17} /><span>Báo cáo của tôi</span></Link>
+          </nav>
+          <div className="profile-sidebar-actions">
+            <Button type="button" onClick={handleOpenUpload} className="w-full justify-center gap-2"><UploadCloud size={16} />Đăng tài liệu mới</Button>
+            {(user?.role === "admin" || user?.role === "moderator") && <Link className="profile-admin-link" to="/admin"><Shield size={16} />{user?.role === "admin" ? "Trang quản trị" : "Trang kiểm duyệt"}</Link>}
+            <button type="button" className="profile-logout-link" onClick={handleLogout}><LogOut size={16} />Đăng xuất</button>
           </div>
+        </aside>
+        <main className="profile-content">
+        <div className="profile-content-toolbar">
+          <div><p className="profile-content-kicker">KHÔNG GIAN CÁ NHÂN</p><h2>{activeTab === "uploads" ? "Tài liệu của tôi" : activeTab === "saved" ? "Tài liệu đã lưu" : activeTab === "downloads" ? "Lịch sử tải xuống" : "Chi tiết tài khoản"}</h2><p>Quản lý hoạt động học tập của bạn trên StudyHub.</p></div>
+          <div className="profile-toolbar-actions"><Button variant="outline" size="sm" onClick={() => { setDocumentsReloadKey((key) => key + 1); fetchProfile(); }} disabled={docsLoading} className="rounded-xl border-border gap-2"><RefreshCw size={15} className={docsLoading ? "animate-spin" : ""} />Làm mới</Button><Button size="sm" onClick={handleOpenUpload} className="rounded-xl gap-2"><UploadCloud size={15} />Đăng tài liệu</Button></div>
         </div>
-      </div>
-
-      {/* 2. REAL-TIME BENTO KPI STATS CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Upload metrics belong to the uploads section only. */}
+      {activeTab === "uploads" && <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Stat 1: Total Uploads */}
         <div className="bg-card p-5 rounded-2xl border border-border/80 shadow-xs hover:border-border transition-all space-y-3">
           <div className="flex items-center justify-between">
@@ -643,111 +520,9 @@ export default function Profile() {
             </p>
           </div>
         </div>
-      </div>
+      </div>}
 
-      {/* 3. TABS NAVIGATION & SEARCH CONTROLS */}
-      <div className="space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/80 pb-4">
-          {/* Modern Pill Segmented Control */}
-          <div className="flex items-center gap-1.5 p-1 bg-muted rounded-2xl max-w-full overflow-x-auto no-scrollbar">
-            <button
-              type="button"
-              onClick={() => setActiveTab("uploads")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
-                activeTab === "uploads"
-                  ? "bg-card text-foreground shadow-xs"
-                  : "text-foreground hover:text-foreground "
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>Tài liệu của tôi</span>
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                  activeTab === "uploads"
-                    ? "bg-primary/10 text-primary font-bold"
-                    : "bg-card text-foreground "
-                }`}
-              >
-                {stats.total}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("saved")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
-                activeTab === "saved"
-                  ? "bg-card text-foreground shadow-xs"
-                  : "text-foreground hover:text-foreground "
-              }`}
-            >
-              <Bookmark className="w-3.5 h-3.5" />
-              <span>Đã lưu</span>
-              {savedDocs.length > 0 && (
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-card text-foreground ">
-                  {savedDocs.length}
-                </span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("downloads")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
-                activeTab === "downloads"
-                  ? "bg-card text-foreground shadow-xs"
-                  : "text-foreground hover:text-foreground "
-              }`}
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Đã tải về</span>
-              {downloadHistory.length > 0 && (
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-card text-foreground ">
-                  {downloadHistory.length}
-                </span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("account")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
-                activeTab === "account"
-                  ? "bg-card text-foreground shadow-xs"
-                  : "text-foreground hover:text-foreground "
-              }`}
-            >
-              <User className="w-3.5 h-3.5" />
-              <span>Tài khoản</span>
-            </button>
-
-            <Link
-              to="/my-reports"
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-foreground hover:text-foreground transition-all hover:bg-card/60 "
-            >
-              <ShieldAlert className="w-3.5 h-3.5 text-warning" />
-              <span>Báo cáo của tôi</span>
-            </Link>
-          </div>
-
-          {/* Quick Refresh */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                fetchMyDocuments();
-                fetchProfile();
-              }}
-              disabled={docsLoading}
-              className="rounded-xl border-border text-xs font-medium text-foreground hover:bg-muted gap-1.5 h-9"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${docsLoading ? "animate-spin" : ""}`} />
-              Làm mới
-            </Button>
-          </div>
-        </div>
-
+        <div className="space-y-5">
         {/* TAB 1: MY UPLOADS (REAL DATA FROM MONGODB) */}
         {activeTab === "uploads" && (
           <div className="space-y-4">
@@ -759,7 +534,7 @@ export default function Profile() {
                   type="text"
                   placeholder="Tìm theo tiêu đề, môn học..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); setDocumentsPage(1); }}
                   className="w-full pl-9 pr-3 py-1.5 text-xs bg-muted border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-foreground placeholder:text-muted-foreground "
                 />
               </div>
@@ -774,7 +549,7 @@ export default function Profile() {
                 ].map((item) => (
                   <button
                     key={item.key}
-                    onClick={() => setStatusFilter(item.key)}
+                    onClick={() => { setStatusFilter(item.key); setDocumentsPage(1); }}
                     className={`px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-all ${
                       statusFilter === item.key
                         ? "bg-card text-foreground font-semibold shadow-xs"
@@ -900,15 +675,15 @@ export default function Profile() {
                       </div>
 
                       {/* Right side: Actions */}
-                      <div className="flex items-center gap-2 self-end md:self-center border-t md:border-t-0 border-border pt-3 md:pt-0 w-full md:w-auto justify-end">
+                      <div className="profile-document-actions">
                         <Link to={`/document/${doc._id}`}>
                           <Button
                             variant="outline"
                             size="sm"
-                            className="rounded-xl border-border text-xs font-semibold h-8.5 px-3 hover:bg-muted gap-1"
+                            className="profile-doc-action profile-doc-action-view"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
-                            Xem
+                            Xem tài liệu
                           </Button>
                         </Link>
 
@@ -920,7 +695,7 @@ export default function Profile() {
                               variant="destructive"
                               disabled={isDeleting}
                               onClick={() => handleDeleteDocument(doc._id)}
-                              className="rounded-xl text-xs font-semibold h-8.5 px-3 gap-1"
+                              className="profile-doc-delete-confirm"
                             >
                               {isDeleting ? "Đang xoá..." : "Xác nhận xoá"}
                             </Button>
@@ -928,7 +703,7 @@ export default function Profile() {
                               size="sm"
                               variant="outline"
                               onClick={() => setDeleteConfirmId(null)}
-                              className="rounded-xl border-border text-xs h-8.5 px-2.5"
+                              className="profile-doc-delete-cancel"
                             >
                               Huỷ
                             </Button>
@@ -939,7 +714,8 @@ export default function Profile() {
                             variant="outline"
                             onClick={() => setDeleteConfirmId(doc._id)}
                             title="Xoá tài liệu này"
-                            className="rounded-xl border-border text-muted-foreground hover:text-destructive hover:border-destructive hover:bg-destructive/10 h-8.5 px-2.5 transition-colors"
+                            aria-label={`Xoá ${doc.title}`}
+                            className="profile-doc-action profile-doc-action-delete"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
@@ -948,6 +724,16 @@ export default function Profile() {
                     </div>
                   );
                 })}
+                <Pagination
+                  page={documentsPagination.page}
+                  total={documentsPagination.total}
+                  pageSize={documentsPagination.limit}
+                  totalPages={documentsPagination.totalPages}
+                  onPageChange={setDocumentsPage}
+                  disabled={docsLoading}
+                  itemLabel="tài liệu"
+                  label="Phân trang tài liệu của tôi"
+                />
               </div>
             )}
           </div>
@@ -1068,50 +854,31 @@ export default function Profile() {
 
         {/* TAB 4: ACCOUNT DETAILS & PROFILE EDIT */}
         {activeTab === "account" && (
-          <div className="bg-card p-6 md:p-8 rounded-3xl border border-border/80 shadow-xs space-y-6">
+          <div className="profile-account-page space-y-5">
+            <section className="profile-account-overview paper-panel" aria-label="Hồ sơ cá nhân">
+              <div className="profile-account-avatar-wrap">
+                <div className="profile-account-avatar">
+                  {avatarUploading ? <Loader2 className="animate-spin" /> : user?.avatarUrl ? <img src={user.avatarUrl} alt={user?.name || "Ảnh đại diện"} referrerPolicy="no-referrer" /> : user?.name?.charAt(0) || "U"}
+                </div>
+                <button type="button" className="profile-avatar-edit" onClick={() => avatarInputRef.current?.click()} disabled={avatarUploading} aria-label="Đổi ảnh đại diện"><Camera size={15} /></button>
+              </div>
+              <div className="profile-account-summary">
+                <div className="profile-account-name-row"><h3>{user?.name || "Người dùng StudyHub"}</h3><Badge variant="outline" className="profile-role-badge">{user?.role === "admin" ? "Quản trị viên" : user?.role === "moderator" ? "Kiểm duyệt viên" : "Sinh viên"}</Badge></div>
+                <p className="profile-account-email">{user?.email}</p>
+                <div className="profile-account-counts" aria-label="Thống kê hồ sơ">
+                  <div><strong>{stats.total}</strong><span>Tài liệu đã đăng</span></div>
+                  <div><strong>{followSummary.followers}</strong><span>Người theo dõi</span></div>
+                  <div><strong>{followSummary.following}</strong><span>Đang theo dõi</span></div>
+                  <Button type="button" variant="outline" size="sm" disabled={avatarUploading} onClick={() => avatarInputRef.current?.click()} className="profile-account-avatar-action"><Camera size={14} />{avatarUploading ? "Đang cập nhật ảnh..." : "Đổi ảnh đại diện"}</Button>
+                </div>
+              </div>
+            </section>
+            <div className="bg-card p-6 md:p-8 rounded-3xl border border-border/80 shadow-xs space-y-6">
             <div>
               <h3 className="text-base font-bold text-foreground ">Chi tiết tài khoản</h3>
               <p className="text-xs text-muted-foreground ">
                 Quản lý và cập nhật thông tin cá nhân của bạn trên StudyHub.
               </p>
-            </div>
-
-            {/* Avatar upload banner */}
-            <div className="p-5 rounded-2xl bg-muted/80 border border-border/60 flex flex-col sm:flex-row items-center gap-5">
-              <div className="relative group shrink-0">
-                <div className="w-20 h-20 rounded-2xl overflow-hidden bg-brand-lavender text-foreground font-bold text-3xl flex items-center justify-center uppercase shadow-sm ring-2 ring-background ">
-                  {avatarUploading ? (
-                    <Loader2 className="w-6 h-6 animate-spin text-foreground" />
-                  ) : user?.avatarUrl ? (
-                    <img
-                      src={user.avatarUrl}
-                      alt={user.name}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    user?.name ? user.name.charAt(0) : "U"
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2 text-center sm:text-left flex-1">
-                <h4 className="text-sm font-bold text-foreground ">Ảnh đại diện</h4>
-                <p className="text-xs text-muted-foreground ">
-                  Tải ảnh từ máy tính cá nhân để thay đổi ảnh đại diện (JPG, PNG, WEBP tối đa 5MB).
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={avatarUploading}
-                  onClick={() => avatarInputRef.current?.click()}
-                  className="rounded-xl border-border text-xs font-semibold gap-1.5 h-8.5 hover:bg-card shadow-xs"
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                  {avatarUploading ? "Đang tải ảnh lên..." : "Chọn ảnh mới từ máy"}
-                </Button>
-              </div>
             </div>
 
             {/* Profile fields: Editable Name, Email, Role, Joined Date */}
@@ -1177,7 +944,10 @@ export default function Profile() {
               </span>
             </div>
           </div>
+          </div>
         )}
+        </div>
+      </main>
       </div>
     </div>
   );

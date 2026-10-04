@@ -9,7 +9,7 @@ const {
   sendDocumentPreviewError,
   sendSafeDocumentPreview,
 } = require("../utils/safeDocumentPreview");
-const { notifyDocumentStatus } = require("../utils/notificationService");
+const { notifyDocumentStatus, notifyFollowersOfNewDocument } = require("../utils/notificationService");
 const AuditLog = require("../models/AuditLog");
 const { recordAuditEvent } = require("../utils/auditLog");
 
@@ -159,7 +159,18 @@ exports.updateDocument = async (req, res) => {
     if (description !== undefined) document.description = description || "";
     if (fileUrl !== undefined) document.fileUrl = fileUrl;
     if (fileName !== undefined) document.fileName = fileName || "";
-    if (fileType !== undefined) document.fileType = fileType || "FILE";
+    if (fileType !== undefined) {
+      const nextFileType = String(fileType || "FILE").trim().toUpperCase();
+      if (document.variantGroupId && nextFileType !== document.fileType) {
+        const duplicateFormat = await Document.exists({
+          variantGroupId: document.variantGroupId,
+          _id: { $ne: document._id },
+          variantFormatKey: nextFileType,
+        });
+        if (duplicateFormat) return res.status(409).json({ message: `Nhóm tài liệu đã có bản ${nextFileType}.` });
+      }
+      document.fileType = nextFileType;
+    }
     if (subjectName !== undefined || req.body.subjectId !== undefined) {
       Object.assign(document, await resolveSubject(req.body.subjectId, subjectName));
     }
@@ -171,15 +182,37 @@ exports.updateDocument = async (req, res) => {
       document.status = status;
       applyModerationNote(document, status, req.body.moderationNote);
     }
+    if (document.variantGroupId) {
+      document.variantFormatKey = document.status === "rejected" ? undefined : document.fileType;
+    }
 
     if (document.status === "approved" && (previousStatus !== "approved" || fileUrl !== undefined)) {
       const source = await checkDocumentSource(document.fileUrl);
       if (source.available === false) return res.status(409).json({ message: source.issue || "Tệp nguồn không khả dụng" });
     }
     await document.save();
+    if (document.variantGroupId) {
+      await Document.updateMany(
+        { variantGroupId: document.variantGroupId, _id: { $ne: document._id } },
+        {
+          $set: {
+            title: document.title,
+            description: document.description,
+            subjectId: document.subjectId,
+            subjectName: document.subjectName,
+            tags: document.tags,
+          },
+        }
+      );
+    }
     if (previousStatus !== document.status) await notifyDocumentStatus(document, document.status).catch((error) => {
       console.error("Không thể tạo thông báo trạng thái tài liệu:", error.message);
     });
+    if (previousStatus !== "approved" && document.status === "approved") {
+      await notifyFollowersOfNewDocument(document).catch((error) => {
+        console.error("Không thể thông báo tài liệu mới cho người theo dõi:", error.message);
+      });
+    }
 
     return res.json({
       message: "Cập nhật tài liệu thành công",
@@ -236,6 +269,9 @@ exports.updateDocumentStatus = async (req, res) => {
     const previousStatus = document.status;
     applyModerationNote(document, status, req.body.moderationNote);
     document.status = status;
+    if (document.variantGroupId) {
+      document.variantFormatKey = status === "rejected" ? undefined : document.fileType;
+    }
     await document.save();
     if (previousStatus !== status) {
       await recordAuditEvent({
@@ -254,6 +290,11 @@ exports.updateDocumentStatus = async (req, res) => {
       await notifyDocumentStatus(document, status).catch((notificationError) => {
         console.error("Không thể tạo thông báo trạng thái tài liệu:", notificationError.message);
       });
+      if (previousStatus !== "approved" && status === "approved") {
+        await notifyFollowersOfNewDocument(document).catch((notificationError) => {
+          console.error("Không thể thông báo tài liệu mới cho người theo dõi:", notificationError.message);
+        });
+      }
     }
     await document.populate("uploaderId", "name email");
 

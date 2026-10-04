@@ -2,6 +2,48 @@ const Document = require("../models/Document");
 const Notification = require("../models/Notification");
 const Report = require("../models/report");
 const User = require("../models/user");
+const Follow = require("../models/Follow");
+
+const sameId = (first, second) => String(first?._id || first || "") === String(second?._id || second || "");
+
+const notifyReviewComment = async (review, document) => {
+  const recipient = document?.uploaderId?._id || document?.uploaderId;
+  if (!review?._id || !recipient || !review.comment?.trim() || sameId(recipient, review.userId)) return;
+  await upsertNotification({
+    recipient,
+    eventKey: `review:${review._id}:comment`,
+    type: "review_received",
+    title: "Tài liệu của bạn có nhận xét mới",
+    message: `${review.userId?.name || "Một sinh viên"} đã để lại nhận xét cho tài liệu “${document.title || "Tài liệu"}”.`,
+    link: `/documents/${document._id}#review-${review._id}`,
+    relatedDocumentId: document._id,
+    createdAt: review.createdAt,
+  });
+};
+
+const notifyReviewReply = async (reply, review, document) => {
+  if (!reply?._id || !review?._id || !document?._id) return;
+  const uploaderId = document.uploaderId?._id || document.uploaderId;
+  const reviewerId = review.userId?._id || review.userId;
+  const recipients = new Map();
+  if (reviewerId && !sameId(reviewerId, reply.userId)) recipients.set(String(reviewerId), {
+    title: "Có người đã trả lời nhận xét của bạn",
+    message: `${reply.userId?.name || "Một sinh viên"} đã phản hồi nhận xét của bạn về “${document.title || "Tài liệu"}”.`,
+  });
+  if (uploaderId && !sameId(uploaderId, reply.userId)) recipients.set(String(uploaderId), {
+    title: "Tài liệu của bạn có phản hồi mới",
+    message: `${reply.userId?.name || "Một sinh viên"} đã trả lời nhận xét trong “${document.title || "Tài liệu"}”.`,
+  });
+  await Promise.allSettled([...recipients].map(([recipient, copy]) => upsertNotification({
+    recipient,
+    eventKey: `review:${review._id}:reply:${reply._id}:${recipient}`,
+    type: "review_reply",
+    ...copy,
+    link: `/documents/${document._id}#review-${review._id}`,
+    relatedDocumentId: document._id,
+    createdAt: reply.createdAt,
+  })));
+};
 
 const upsertNotification = async ({ recipient, eventKey, ...payload }) => {
   if (!recipient || !eventKey) return null;
@@ -53,7 +95,7 @@ const notifyDocumentSubmitted = async (document) => {
 const notifyDocumentStatus = async (document, status) => {
   if (!document?._id || !document?.uploaderId || !["approved", "rejected"].includes(status)) return;
   const approved = status === "approved";
-  await upsertNotification({
+  const uploaderNotification = upsertNotification({
     recipient: document.uploaderId?._id || document.uploaderId,
     eventKey: `document:${document._id}:status:${status}`,
     type: approved ? "document_approved" : "document_rejected",
@@ -65,6 +107,29 @@ const notifyDocumentStatus = async (document, status) => {
     relatedDocumentId: document._id,
     createdAt: document.updatedAt || new Date(),
   });
+  return uploaderNotification;
+};
+
+const notifyFollowersOfNewDocument = async (document) => {
+  if (!document?._id || !document?.uploaderId) return;
+  const uploaderId = document.uploaderId?._id || document.uploaderId;
+  const [followers, uploader] = await Promise.all([
+    Follow.find({ followingId: uploaderId }).distinct("followerId"),
+    User.findById(uploaderId).select("name").lean(),
+  ]);
+  const isAdditionalFormat = Boolean(document.variantGroupId) && String(document.variantGroupId) !== String(document._id);
+  await Promise.allSettled(followers.map((recipient) => upsertNotification({
+    recipient,
+    eventKey: `document:${document._id}:from-following:${recipient}`,
+    type: "document_from_following",
+    title: isAdditionalFormat ? "Tài liệu bạn theo dõi có định dạng mới" : "Người bạn theo dõi vừa đăng tài liệu",
+    message: isAdditionalFormat
+      ? `Bản ${document.fileType || "tệp mới"} của “${document.title || "tài liệu"}” đã được duyệt, do ${uploader?.name || "người bạn theo dõi"} chia sẻ.`
+      : `${document.title || "Một tài liệu mới"} đã được duyệt và chia sẻ bởi ${uploader?.name || "người bạn theo dõi"}.`,
+    link: `/documents/${document._id}`,
+    relatedDocumentId: document._id,
+    createdAt: document.updatedAt || new Date(),
+  })));
 };
 
 const notifyReportSubmitted = async (report, document) => {
@@ -171,10 +236,13 @@ const syncHistoricalNotificationsForUser = async (user) => {
 
 module.exports = {
   notifyDocumentStatus,
+  notifyFollowersOfNewDocument,
   notifyDocumentSubmitted,
   notifyModerators,
   notifyReportStatus,
   notifyReportSubmitted,
+  notifyReviewComment,
+  notifyReviewReply,
   syncHistoricalNotificationsForUser,
   upsertNotification,
 };

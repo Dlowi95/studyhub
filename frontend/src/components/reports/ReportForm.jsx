@@ -1,3 +1,4 @@
+import { API_URL } from "@/lib/api";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -13,7 +14,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Flag, Loader2 } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL;
+
 
 const REASONS = [
   "Vi phạm bản quyền",

@@ -10,7 +10,7 @@ export default function AdvancedSearch({ filters, subjects, onApply }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(() => Object.fromEntries(ADVANCED_KEYS.map(key => [key, filters[key]])));
   const [error, setError] = useState('');
-  const count = ADVANCED_KEYS.filter(key => filters[key] !== SEARCH_DEFAULTS[key]).length;
+  const count = ADVANCED_KEYS.filter(key => key !== 'match' && filters[key] !== SEARCH_DEFAULTS[key]).length;
   const change = (key, value) => { setDraft(prev => ({ ...prev, [key]: value })); setError(''); };
   const chips = [
     filters.subject && { label: filters.subject, keys: ['subject'] },
@@ -19,14 +19,13 @@ export default function AdvancedSearch({ filters, subjects, onApply }) {
     filters.minDownloads && { label: `Từ ${filters.minDownloads} lượt tải`, keys: ['minDownloads'] },
     (filters.from || filters.to) && { label: `${filters.from ? new Date(`${filters.from}T00:00:00`).toLocaleDateString('vi-VN') : 'Bất kỳ ngày nào'} → ${filters.to ? new Date(`${filters.to}T00:00:00`).toLocaleDateString('vi-VN') : 'Không giới hạn'}`, keys: ['from', 'to'] },
     filters.searchIn !== 'all' && { label: filters.searchIn === 'title' ? 'Trong tiêu đề' : 'Trong từ khóa', keys: ['searchIn'] },
-    filters.match === 'phrase' && { label: 'Đúng cụm từ', keys: ['match'] },
   ].filter(Boolean);
   const field = (key, name, content) => <label className="advanced-field" htmlFor={`${id}-${key}`}><span>{name}</span>{content}</label>;
 
   const apply = event => {
     event.preventDefault();
     if (draft.from && draft.to && draft.from > draft.to) { setError('Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.'); return; }
-    onApply(draft); setOpen(false);
+    onApply({ ...draft, match: 'all' }); setOpen(false);
   };
 
   return (
@@ -41,7 +40,6 @@ export default function AdvancedSearch({ filters, subjects, onApply }) {
           {field('from', 'Đăng từ ngày', <input id={`${id}-from`} type="date" value={draft.from} max={draft.to || undefined} onChange={event => change('from', event.target.value)} />)}
           {field('to', 'Đăng đến ngày', <input id={`${id}-to`} type="date" value={draft.to} min={draft.from || undefined} onChange={event => change('to', event.target.value)} />)}
           {field('searchIn', 'Tìm từ khóa trong', <select id={`${id}-searchIn`} value={draft.searchIn} onChange={event => change('searchIn', event.target.value)}><option value="all">Toàn bộ thông tin</option><option value="title">Tiêu đề tài liệu</option><option value="tags">Từ khóa tài liệu</option></select>)}
-          {field('match', 'Cách khớp từ khóa', <select id={`${id}-match`} value={draft.match} onChange={event => change('match', event.target.value)}><option value="all">Có đủ các từ</option><option value="phrase">Đúng cụm từ</option></select>)}
         </div>
         {error && <p className="advanced-error" role="alert">{error}</p>}
         <div className="advanced-panel-footer"><p>Chỉ tìm trong tài liệu đã được duyệt. Ngày đăng theo giờ Việt Nam.</p><div><button type="button" className="paper-button" onClick={() => { setDraft(resetFilters); setError(''); }}>Đặt lại</button><button type="submit" className="paper-button paper-button-primary">Áp dụng bộ lọc</button></div></div>

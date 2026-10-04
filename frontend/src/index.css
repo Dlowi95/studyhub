@@ -1,3 +1,4 @@
+@import './fonts.css';
 @import './design-system.css';
 @import './search.css';
 @tailwind base;
@@ -20,6 +21,7 @@
     --brand-mint: 176 49% 80%; --brand-cream: 36 71% 83%;
     --radius: 1rem; --paper-shadow: 5px 5px 0 #4b763f;
     --pastel-pink: #e899c1; --pastel-lavender: #c5c6ef; --pastel-mint: #b4e5e2;
+    --format-pdf-soft: #f3c1be; --format-docx-soft: #bfdef5; --format-pptx-soft: #f5d3a7; --format-txt-soft: #fff1c8;
     --pastel-cream: #f2d9b3; --pastel-soft-cream: #f7e8d1;
     --illustration-ink: #344e2c; --illustration-border: #4b763f;
     --illustration-paper: #fffefa; --illustration-shadow: #4b763f;
@@ -39,6 +41,7 @@
     --brand-pink: 326 16% 25%; --brand-lavender: 243 14% 26%;
     --brand-mint: 157 20% 21%; --brand-cream: 35 16% 23%;
     --pastel-pink: #49363f; --pastel-lavender: #363542; --pastel-mint: #2b4138;
+    --format-pdf-soft: #4d302f; --format-docx-soft: #304354; --format-pptx-soft: #4b3d2c; --format-txt-soft: #48412f;
     --pastel-cream: #403a30; --pastel-soft-cream: #35332c;
     --illustration-ink: #ece9df; --illustration-border: #8ea486;
     --illustration-paper: #26302a; --illustration-shadow: #0c120e;

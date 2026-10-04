@@ -12,7 +12,7 @@ export default function SiteHeader({ user, token, onOpenAuth, onUpload, onLogout
   const authenticated = Boolean(token && user);
   const manages = authenticated && ["admin", "moderator"].includes(user.role);
   const links = [
-    { label: "Trang chủ", to: "/" }, { label: "Học phần", to: "/#subjects" },
+    { label: "Trang chủ", to: "/" }, { label: "Học phần", to: "/subjects" },
     { label: "Thư viện", to: "/#featured" },
     ...(authenticated ? [{ label: "Báo cáo của tôi", to: "/my-reports" }] : []),
   ];

@@ -29,6 +29,24 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
+const optionalAuthenticateToken = async (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+  if (!token) return next();
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+    if (user?.status === "blocked") {
+      return res.status(403).json({ message: "Your account has been locked" });
+    }
+    if (user) req.user = user;
+  } catch {
+    // Public document interactions remain available if a stored token has expired.
+  }
+  return next();
+};
+
 const authorizeRoles = (...roles) => {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
@@ -40,5 +58,6 @@ const authorizeRoles = (...roles) => {
 
 module.exports = {
   authenticateToken,
+  optionalAuthenticateToken,
   authorizeRoles,
 };

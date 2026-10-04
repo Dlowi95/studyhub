@@ -5,6 +5,7 @@ const User = require("../models/user");
 const Document = require("../models/Document");
 const AuditLog = require("../models/AuditLog");
 const DocumentInteraction = require("../models/DocumentInteraction");
+const DocumentDownload = require("../models/DocumentDownload");
 const bookmarks = require("../controllers/bookmarkController");
 const admin = require("../controllers/adminController");
 const documents = require("../controllers/documentController");
@@ -73,4 +74,55 @@ test("view and download counters ignore duplicate interactions in the same windo
   assert.equal(increments, 1);
   assert.equal(claims, 2);
   assert.ok(mongoose.isObjectIdOrHexString(id));
+});
+
+test("authenticated views deduplicate across browser sessions for the same account", async (t) => {
+  const claimed = new Set();
+  let increments = 0;
+  t.mock.method(DocumentInteraction, "create", async (interaction) => {
+    const key = `${interaction.documentId}:${interaction.type}:${interaction.sessionId}:${interaction.bucket}`;
+    if (claimed.has(key)) throw Object.assign(new Error("duplicate"), { code: 11000 });
+    claimed.add(key);
+    return {};
+  });
+  t.mock.method(Document, "findOneAndUpdate", async () => ({ _id: id, viewCount: ++increments }));
+  const request = { params: { id }, headers: { "x-studyhub-session": "browser-one" }, user: { _id: otherId } };
+  const first = response();
+  await documents.incrementView(request, first);
+  request.headers["x-studyhub-session"] = "browser-two";
+  const repeated = response();
+  await documents.incrementView(request, repeated);
+
+  assert.equal(first.body.counted, true);
+  assert.equal(repeated.body.counted, false);
+  assert.equal(increments, 1);
+});
+
+test("account download counters increase only on the first download per account and document", async (t) => {
+  let claims = 0;
+  let increments = 0;
+  const approved = { _id: id, status: "approved", downloadCount: 0 };
+  t.mock.method(Document, "findOne", async () => approved);
+  t.mock.method(DocumentDownload, "create", async () => {
+    claims += 1;
+    if (claims > 1) throw Object.assign(new Error("duplicate"), { code: 11000 });
+    return {};
+  });
+  t.mock.method(Document, "findOneAndUpdate", async () => {
+    increments += 1;
+    return { ...approved, downloadCount: increments };
+  });
+  t.mock.method(Document, "findById", async () => ({ ...approved, downloadCount: increments }));
+
+  const request = { params: { id }, headers: {}, user: { _id: otherId } };
+  const first = response();
+  await documents.incrementDownload(request, first);
+  const repeated = response();
+  await documents.incrementDownload(request, repeated);
+
+  assert.equal(first.body.counted, true);
+  assert.equal(repeated.body.counted, false);
+  assert.equal(repeated.body.document.downloadCount, 1);
+  assert.equal(increments, 1);
+  assert.equal(claims, 2);
 });

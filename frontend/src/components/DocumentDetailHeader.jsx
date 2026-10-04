@@ -1,22 +1,27 @@
-import { CalendarDays, FileText, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { Fragment } from "react";
+import FollowButton from "@/components/FollowButton";
+import FileTypeIcon from "@/components/FileTypeIcon";
 
 export default function DocumentDetailHeader({ doc }) {
   if (!doc) return null;
 
   const uploaderName = doc.uploaderId?.name || doc.uploader || "Thành viên StudyHub";
   const uploaderInitial = uploaderName.charAt(0).toUpperCase();
+  const titleParts = String(doc.title || "Tài liệu").split("_");
 
   return (
-    <div className="space-y-4 text-left">
+    <div className="min-w-0 space-y-4 text-left">
       {/* Badges Row */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Subject Pill */}
-        <span className="rounded-xl bg-primary/10 text-primary border border-primary/80 px-3 py-1 text-xs font-bold">
+        <span className="max-w-full [overflow-wrap:anywhere] rounded-xl bg-primary/10 text-primary border border-primary/80 px-3 py-1 text-xs font-bold">
           {doc.subjectName || doc.subject || "Học phần chung"}
         </span>
 
         {/* File Format Pill */}
-        <span className="rounded-xl bg-muted text-foreground border border-border px-2.5 py-1 text-xs font-bold uppercase tracking-wider">
+        <span className="document-format-badge rounded-xl bg-muted text-foreground border border-border px-2.5 py-1 text-xs font-bold uppercase tracking-wider">
+          <FileTypeIcon format={doc.type || doc.fileType} />
           {doc.type || "FILE"}
         </span>
 
@@ -42,22 +47,21 @@ export default function DocumentDetailHeader({ doc }) {
       </div>
 
       {/* Document Title */}
-      <h1 className="text-2xl md:text-3xl lg:text-4xl font-extrabold text-foreground tracking-tight leading-tight">
-        {doc.title}
+      <h1 className="document-title text-2xl md:text-3xl lg:text-4xl font-extrabold text-foreground">
+        {titleParts.map((part, index) => <Fragment key={index}>{part}{index < titleParts.length - 1 && <>_<wbr /></>}</Fragment>)}
       </h1>
 
       {/* Uploader Bento Info Strip */}
-      <div className="flex flex-wrap items-center gap-4 py-2 text-xs md:text-sm text-muted-foreground border-y border-border ">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold uppercase">
+      <div className="document-uploader-strip flex flex-wrap items-center gap-3 py-2 text-xs md:text-sm text-muted-foreground border-y border-border">
+        <div className="flex min-w-0 max-w-full items-center gap-2">
+          <div className="w-6 h-6 shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold uppercase">
             {uploaderInitial}
           </div>
-          <span className="font-semibold text-foreground ">{uploaderName}</span>
+          <span className="[overflow-wrap:anywhere] font-semibold text-foreground">{uploaderName}</span>
+          <FollowButton uploaderId={doc.uploaderId?._id || doc.uploaderId} uploaderName={uploaderName} />
         </div>
 
-        <span>•</span>
-
-        <span className="inline-flex items-center gap-1.5 text-muted-foreground ">
+        <span className="document-published-date inline-flex items-center gap-1.5 text-muted-foreground">
           <CalendarDays className="w-3.5 h-3.5" />
           Ngày đăng:{" "}
           {doc.createdAt
@@ -69,15 +73,6 @@ export default function DocumentDetailHeader({ doc }) {
             : "Gần đây"}
         </span>
 
-        {doc.fileName && (
-          <>
-            <span>•</span>
-            <span className="inline-flex items-center gap-1.5 text-muted-foreground max-w-[200px] truncate">
-              <FileText className="w-3.5 h-3.5 shrink-0" />
-              {doc.fileName}
-            </span>
-          </>
-        )}
       </div>
     </div>
   );

@@ -46,6 +46,16 @@ const documentSchema = new mongoose.Schema(
       type: String,
       default: "Khác",
     },
+    variantGroupId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Document",
+      default: null,
+      index: true,
+    },
+    variantFormatKey: {
+      type: String,
+      default: undefined,
+    },
     uploaderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -78,8 +88,14 @@ const documentSchema = new mongoose.Schema(
 );
 
 documentSchema.index({ title: 'text', description: 'text', tags: 'text', subjectName: 'text' });
+documentSchema.index({ uploaderId: 1, createdAt: -1, _id: -1 });
+documentSchema.index({ uploaderId: 1, status: 1, createdAt: -1, _id: -1 });
 documentSchema.index({ status: 1, createdAt: -1 });
 documentSchema.index({ subjectName: 1, fileType: 1 });
 documentSchema.index({ viewCount: -1, downloadCount: -1 });
+documentSchema.index(
+  { variantGroupId: 1, variantFormatKey: 1 },
+  { unique: true, partialFilterExpression: { variantFormatKey: { $type: "string" } } }
+);
 
 module.exports = mongoose.model("Document", documentSchema);

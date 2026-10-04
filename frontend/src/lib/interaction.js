@@ -14,6 +14,13 @@ const createSessionId = () => {
   }
 };
 
-export const interactionHeaders = () => ({
-  "X-StudyHub-Session": createSessionId(),
-});
+export const interactionHeaders = () => {
+  const headers = { "X-StudyHub-Session": createSessionId() };
+  try {
+    const token = localStorage.getItem("token");
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } catch {
+    // Keep anonymous interaction tracking available when browser storage is blocked.
+  }
+  return headers;
+};

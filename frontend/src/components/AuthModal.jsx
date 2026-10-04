@@ -1,3 +1,4 @@
+import { API_URL } from "@/lib/api";
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,7 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
     setSuccess("");
     setLoading(true);
 
-    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+    const apiUrl = API_URL;
 
     try {
       if (tab === "login") {
@@ -145,7 +146,7 @@ export default function AuthModal({ isOpen, onClose, initialTab = "login" }) {
               }
 
               // 2. Gửi Google access_token về backend StudyHub để xác thực an toàn
-              const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+              const apiUrl = API_URL;
               const res = await fetch(`${apiUrl}/auth/google`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

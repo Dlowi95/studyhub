@@ -14,6 +14,9 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['"Plus Jakarta Sans"', '"Segoe UI"', 'system-ui', 'sans-serif'],
+      },
       colors: {
         success: "hsl(var(--success))",
         warning: "hsl(var(--warning))",

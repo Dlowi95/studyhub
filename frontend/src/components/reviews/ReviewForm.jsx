@@ -1,11 +1,11 @@
+import { API_URL } from "@/lib/api";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import StarRating from "./StarRating";
-import { Loader2 } from "lucide-react";
+import { Loader2, MessageSquareText, Send, Sparkles, Star } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 /**
  * Form gửi đánh giá (sao + bình luận) cho 1 tài liệu.
@@ -19,14 +19,16 @@ export default function ReviewForm({ documentId, onSuccess }) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const { toast } = useToast();
 
   const token = localStorage.getItem("token");
 
   if (!token) {
     return (
-      <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-        Bạn cần{" "}
+      <div className="review-login-prompt">
+        <span className="review-prompt-icon"><Star size={19} /></span>
+        <p>Bạn cần{" "}
         <button
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent("openAuthModal", { detail: { tab: "login" } }))}
@@ -34,7 +36,7 @@ export default function ReviewForm({ documentId, onSuccess }) {
         >
           đăng nhập
         </button>{" "}
-        để đánh giá tài liệu này.
+        để đánh giá và chia sẻ cảm nhận về tài liệu.</p>
       </div>
     );
   }
@@ -52,6 +54,7 @@ export default function ReviewForm({ documentId, onSuccess }) {
     }
 
     setLoading(true);
+    setError("");
     try {
       const res = await fetch(`${API_URL}/documents/${documentId}/reviews`, {
         method: "POST",
@@ -65,6 +68,7 @@ export default function ReviewForm({ documentId, onSuccess }) {
 
       if (!res.ok) {
         if (res.status === 409) {
+          setError("Tài khoản của bạn đã đánh giá tài liệu này rồi.");
           toast({
             variant: "destructive",
             title: "Không thể đánh giá",
@@ -81,6 +85,7 @@ export default function ReviewForm({ documentId, onSuccess }) {
       setComment("");
       onSuccess?.(data.review, data.avgRating);
     } catch (err) {
+      setError(err.message || "Vui lòng thử lại sau.");
       toast({
         variant: "destructive",
         title: "Có lỗi xảy ra",
@@ -92,31 +97,41 @@ export default function ReviewForm({ documentId, onSuccess }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border p-4">
-      <div>
-        <Label className="mb-1.5 block">Đánh giá của bạn</Label>
-        <StarRating value={rating} onChange={setRating} interactive size={24} />
+    <form onSubmit={handleSubmit} className="review-form">
+      <div className="review-rating-block">
+        <div className="review-field-heading">
+          <span className="review-prompt-icon"><Star size={19} /></span>
+          <div><Label>Đánh giá của bạn</Label><p>Chọn số sao phù hợp với trải nghiệm học tập của bạn.</p></div>
+        </div>
+        <div className="review-star-picker">
+          <StarRating value={rating} onChange={setRating} interactive size={30} />
+          <span className="review-rating-hint" aria-live="polite">{rating ? `${rating}/5 · ${['', 'Chưa tốt', 'Tạm ổn', 'Khá tốt', 'Rất tốt', 'Tuyệt vời'][rating]}` : 'Chạm để chọn số sao'}</span>
+        </div>
       </div>
 
-      <div>
-        <Label htmlFor="review-comment" className="mb-1.5 block">
-          Bình luận <span className="text-muted-foreground">(không bắt buộc)</span>
-        </Label>
+      <div className="review-comment-field">
+        <Label htmlFor="review-comment"><MessageSquareText size={16} /> Viết nhận xét <span>(không bắt buộc)</span></Label>
         <textarea
           id="review-comment"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          rows={3}
+          rows={4}
+          disabled={loading}
           maxLength={1000}
           placeholder="Tài liệu này giúp ích gì cho bạn?"
-          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="review-textarea"
         />
+        <div className="review-character-count">{comment.length}/1.000 ký tự</div>
       </div>
 
-      <Button type="submit" disabled={loading}>
-        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Gửi đánh giá
-      </Button>
+      {error && <p role="alert" className="review-inline-error">{error}</p>}
+      <div className="review-submit-row">
+        <p><Sparkles size={15} /> Chia sẻ tử tế giúp mọi người chọn tài liệu phù hợp.</p>
+        <Button type="submit" disabled={loading || rating < 1} className="review-submit-button">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          Gửi đánh giá
+        </Button>
+      </div>
     </form>
   );
 }

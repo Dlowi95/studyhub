@@ -13,3 +13,35 @@ export function validateUploadFile(file) {
   }
   return "";
 }
+
+export async function uploadDocumentsIndividually({ files, subjectName, docType, description, tags, apiUrl, token, onProgress }) {
+  const uploaded = [];
+  const failed = [];
+
+  for (let index = 0; index < files.length; index += 1) {
+    const item = files[index];
+    const formData = new FormData();
+    formData.append("title", item.title.trim());
+    formData.append("description", description?.trim() || `${docType} - ${subjectName}`);
+    formData.append("subjectName", subjectName);
+    formData.append("tags", tags?.trim() || subjectName);
+    formData.append("file", item.file);
+
+    try {
+      const response = await fetch(`${apiUrl}/documents/upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Không thể gửi tệp này.");
+      uploaded.push(data.document);
+    } catch (error) {
+      failed.push({ title: item.title, fileName: item.file.name, message: error.message || "Lỗi kết nối máy chủ." });
+    } finally {
+      onProgress?.(index + 1, files.length);
+    }
+  }
+
+  return { uploaded, failed };
+}
