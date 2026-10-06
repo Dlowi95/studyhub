@@ -18,8 +18,8 @@ const Profile = lazy(() => import("./pages/Profile"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const UploadDocument = lazy(() => import("./pages/UploadDocument"));
 const DocumentDetailPage = lazy(() => import("./pages/DocumentDetailPage"));
+const DocumentPreviewPage = lazy(() => import("./pages/DocumentPreviewPage"));
 const SubjectDetailPage = lazy(() => import("./pages/SubjectDetailPage"));
-const MyReports = lazy(() => import("./pages/MyReports"));
 
 function PageLoadingFallback() {
   return (
@@ -349,11 +349,12 @@ function MainLayout() {
             <Route path="/subjects/:subjectName" element={<SubjectDetailPage onOpenAuth={openAuth} user={user} />} />
             <Route path="/login" element={<AuthRedirect tab="login" onOpenAuth={openAuth} />} />
             <Route path="/register" element={<AuthRedirect tab="register" onOpenAuth={openAuth} />} />
+            <Route path="/documents/:id/preview" element={<DocumentPreviewPage />} />
             <Route path="/document/:id" element={<DocumentDetailPage />} />
             <Route path="/documents/:id" element={<DocumentDetailPage />} />
             <Route path="/documents/upload" element={uploadsEnabled ? <ProtectedRoute><UploadDocument /></ProtectedRoute> : <UploadPausedPage message={systemStatus?.uploadsMessage || "Đang tạm ngưng nhận tài liệu mới."} />} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-            <Route path="/my-reports" element={<ProtectedRoute><MyReports /></ProtectedRoute>} />
+            <Route path="/my-reports" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

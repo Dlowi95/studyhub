@@ -40,8 +40,8 @@ router.get("/my", authenticateToken, getMyDocuments);
 router.get("/suggestions", getSearchSuggestions);
 router.get("/", getDocuments);
 router.get("/:id/variants", getDocumentVariants);
-router.get("/:id/preview", previewDocument);
-router.get("/:id", getDocumentById);
+router.get("/:id/preview", optionalAuthenticateToken, previewDocument);
+router.get("/:id", optionalAuthenticateToken, getDocumentById);
 
 // public endpoints to increment counters
 router.post("/:id/view", optionalAuthenticateToken, incrementView);

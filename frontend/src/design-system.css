@@ -1867,7 +1867,7 @@
 .profile-side-nav { display: grid; gap: 5px; padding: 16px 0; border-top: 1px solid hsl(var(--border)); border-bottom: 1px solid hsl(var(--border)); }
 .profile-side-nav button, .profile-side-nav a { display: flex; min-height: 42px; align-items: center; gap: 11px; padding: 0 11px; border: 1px solid transparent; border-radius: 12px; background: transparent; color: hsl(var(--muted-foreground)); font: inherit; font-size: 12px; font-weight: 650; text-align: left; text-decoration: none; transition: color .15s, background .15s, border-color .15s; }
 .profile-side-nav button:hover, .profile-side-nav a:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
-.profile-side-nav button.is-active { border-color: hsl(var(--primary) / .16); background: hsl(var(--primary) / .1); color: hsl(var(--primary)); }
+.profile-side-nav button.is-active, .profile-side-nav a.is-active { border-color: hsl(var(--primary) / .16); background: hsl(var(--primary) / .1); color: hsl(var(--primary)); }
 .profile-side-nav button > span:nth-child(2), .profile-side-nav a > span { flex: 1; }
 .profile-nav-count { display: grid; min-width: 23px; height: 22px; place-items: center; padding: 0 6px; border-radius: 999px; background: hsl(var(--card)); color: hsl(var(--muted-foreground)); font-size: 10px; }
 .profile-sidebar-actions { display: grid; gap: 8px; }

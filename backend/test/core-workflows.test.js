@@ -117,6 +117,35 @@ test("pending documents cannot be opened through public detail or counters", asy
   }
 });
 
+test("an uploader can privately open their own rejected document", async (t) => {
+  const rejectedDocument = {
+    _id: id,
+    status: "rejected",
+    uploaderId: { _id: id, name: "Người đăng" },
+    fileUrl: "",
+    toObject() { return this; },
+  };
+  t.mock.method(Document, "findById", () => ({ populate: async () => rejectedDocument }));
+  const res = response();
+  await documents.getDocumentById({ params: { id }, user: { _id: id } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.status, "rejected");
+});
+
+test("a rejected document stays private to everyone except its uploader", async (t) => {
+  const rejectedDocument = { status: "rejected", uploaderId: id, fileName: "bai-tap.pdf", fileUrl: "" };
+  t.mock.method(Document, "findById", () => ({ lean: async () => rejectedDocument }));
+
+  const ownerResponse = response();
+  await documents.previewDocument({ params: { id }, user: { _id: id } }, ownerResponse);
+  assert.equal(ownerResponse.statusCode, 415);
+  assert.notEqual(ownerResponse.body.message, "Tài liệu không tồn tại hoặc chưa được công khai");
+
+  const publicResponse = response();
+  await documents.previewDocument({ params: { id } }, publicResponse);
+  assert.equal(publicResponse.statusCode, 404);
+});
+
 test("public statistics never aggregate pending documents; admin can see all", async (t) => {
   const matches = [];
   t.mock.method(Document, "aggregate", async (pipeline) => { matches.push(pipeline[0].$match); return []; });
@@ -217,6 +246,37 @@ test("reopening a report does not automatically approve the document", async (t)
   assert.equal(res.statusCode, 200);
   assert.equal(find.mock.callCount(), 0);
   assert.equal(report.handledBy, null);
+});
+
+test("dismissing a report closes only the report and leaves the document approved", async (t) => {
+  const document = { _id: id, title: "Bài tập", status: "approved" };
+  const report = {
+    _id: id,
+    documentId: document,
+    documentTitle: document.title,
+    reporterId: id,
+    status: "pending",
+    async save() {},
+  };
+  let reportNotification;
+  let documentLookups = 0;
+  t.mock.method(Report, "findById", () => ({ populate: async () => report }));
+  t.mock.method(Document, "findById", async () => { documentLookups += 1; return document; });
+  t.mock.method(Notification, "findOneAndUpdate", async (_filter, update) => { reportNotification = update.$set; });
+
+  const res = response();
+  await reports.updateReportStatus({
+    params: { id },
+    body: { action: "dismiss", adminFeedback: "Không đủ căn cứ" },
+    user: { _id: id, role: "admin" },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(report.status, "dismissed");
+  assert.equal(document.status, "approved");
+  assert.equal(documentLookups, 0);
+  assert.equal(reportNotification.type, "report_dismissed");
+  assert.match(reportNotification.message, /không thay đổi trạng thái duyệt của tài liệu/);
 });
 
 test("admin rejection stores the selected reason and includes it in the uploader notification", async (t) => {

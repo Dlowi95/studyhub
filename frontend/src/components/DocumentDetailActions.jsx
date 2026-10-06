@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Download, FileText, MessageSquareWarning, Bookmark, Share2, Check, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { normalizeFileUrl } from "@/lib/file-url";
+import { getDocumentPreviewPath } from "@/lib/document-preview";
 
 export default function DocumentDetailActions({
   doc,
@@ -145,7 +145,7 @@ export default function DocumentDetailActions({
             disabled={fileUnavailable}
             onClick={() => {
               if (!fileUnavailable) {
-                window.open(normalizeFileUrl(doc.fileUrl), "_blank", "noopener,noreferrer");
+                window.open(getDocumentPreviewPath(doc.id || doc._id), "_blank", "noopener,noreferrer");
               }
             }}
             className="h-11 w-full justify-start gap-2.5 rounded-2xl border-border bg-card px-4 text-sm font-semibold text-foreground shadow-xs transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary "
@@ -165,81 +165,85 @@ export default function DocumentDetailActions({
       )}
 
       {/* Utility actions */}
-      <div className="grid grid-cols-2 gap-2 border-t border-border pt-4 ">
-        {/* Bookmark Button */}
-        <Button
-          type="button"
-          variant="outline"
-          disabled={bookmarkBusy}
-          size="sm"
-          onClick={handleToggleBookmark}
-          className={`h-10 w-full rounded-xl border-border text-xs font-semibold gap-1.5 transition-colors  ${
-            isBookmarked
-              ? "bg-warning/10 text-warning border-warning hover:bg-warning/10 "
-              : "text-foreground hover:bg-muted "
-          }`}
-        >
-          <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? "fill-warning text-warning" : ""}`} />
-          <span>{isBookmarked ? "Đã lưu" : "Lưu tài liệu"}</span>
-        </Button>
+      {doc.status === "approved" && (
+        <>
+          <div className="grid grid-cols-2 gap-2 border-t border-border pt-4 ">
+            {/* Bookmark Button */}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={bookmarkBusy}
+              size="sm"
+              onClick={handleToggleBookmark}
+              className={`h-10 w-full rounded-xl border-border text-xs font-semibold gap-1.5 transition-colors  ${
+                isBookmarked
+                  ? "bg-warning/10 text-warning border-warning hover:bg-warning/10 "
+                  : "text-foreground hover:bg-muted "
+              }`}
+            >
+              <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? "fill-warning text-warning" : ""}`} />
+              <span>{isBookmarked ? "Đã lưu" : "Lưu tài liệu"}</span>
+            </Button>
 
-        {/* Share Button */}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleShare}
-          className="h-10 w-full rounded-xl border-border text-xs font-semibold text-foreground gap-1.5 hover:bg-muted "
-        >
-          {isCopied ? (
-            <>
-              <Check className="w-3.5 h-3.5 text-primary " />
-              <span className="text-primary ">Đã sao chép</span>
-            </>
-          ) : (
-            <>
-              <Share2 className="w-3.5 h-3.5" />
-              <span>Chia sẻ</span>
-            </>
-          )}
-        </Button>
+            {/* Share Button */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleShare}
+              className="h-10 w-full rounded-xl border-border text-xs font-semibold text-foreground gap-1.5 hover:bg-muted "
+            >
+              {isCopied ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-primary " />
+                  <span className="text-primary ">Đã sao chép</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Chia sẻ</span>
+                </>
+              )}
+            </Button>
 
-      </div>
+          </div>
 
-      {/* Report action */}
-      <div>
-        {hasReported ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              toast({
-                title: "Tài liệu đã được báo cáo",
-                description:
-                  reportStatus === "resolved"
-                    ? "Báo cáo của bạn về tài liệu này đã được quản trị viên xử lý."
-                    : "Bạn đã gửi báo cáo vi phạm cho tài liệu này và đang chờ ban quản trị xem xét.",
-              });
-            }}
-            className="h-9 w-full rounded-xl border-warning bg-warning/10 text-xs font-semibold text-warning gap-1.5 shadow-2xs cursor-pointer "
-          >
-            <MessageSquareWarning className="w-3.5 h-3.5 text-warning " />
-            <span>Đã báo cáo vi phạm</span>
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onReport?.(doc)}
-            className="h-9 w-full rounded-xl border-border bg-card text-xs font-semibold text-muted-foreground gap-1.5 transition-colors hover:border-destructive hover:bg-destructive/10 hover:text-destructive "
-          >
-            <MessageSquareWarning className="w-3.5 h-3.5" />
-            <span>Báo cáo vi phạm</span>
-          </Button>
-        )}
-      </div>
+          {/* Report action */}
+          <div>
+            {hasReported ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  toast({
+                    title: "Tài liệu đã được báo cáo",
+                    description:
+                      reportStatus === "resolved"
+                        ? "Báo cáo của bạn về tài liệu này đã được quản trị viên xử lý."
+                        : "Bạn đã gửi báo cáo vi phạm cho tài liệu này và đang chờ ban quản trị xem xét.",
+                  });
+                }}
+                className="h-9 w-full rounded-xl border-warning bg-warning/10 text-xs font-semibold text-warning gap-1.5 shadow-2xs cursor-pointer "
+              >
+                <MessageSquareWarning className="w-3.5 h-3.5 text-warning " />
+                <span>Đã báo cáo vi phạm</span>
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onReport?.(doc)}
+                className="h-9 w-full rounded-xl border-border bg-card text-xs font-semibold text-muted-foreground gap-1.5 transition-colors hover:border-destructive hover:bg-destructive/10 hover:text-destructive "
+              >
+                <MessageSquareWarning className="w-3.5 h-3.5" />
+                <span>Báo cáo vi phạm</span>
+              </Button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

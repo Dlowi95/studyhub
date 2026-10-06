@@ -13,10 +13,10 @@ exports.downloadStoredFile = async (req, res) => {
     const document = await Document.findOne({
       storageProvider: "gridfs",
       storageKey,
-      status: "approved",
     }).lean();
 
-    if (!document) {
+    const isOwner = document && req.user?._id && String(document.uploaderId) === String(req.user._id);
+    if (!document || (document.status !== "approved" && !isOwner)) {
       return res.status(404).json({ message: "Tệp không tồn tại hoặc chưa được công khai" });
     }
 

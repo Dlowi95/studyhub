@@ -32,6 +32,11 @@ const getInteractionSession = (req) => {
   return `${req.ip || "anonymous"}:${req.headers["user-agent"] || ""}`;
 };
 
+const isDocumentOwner = (document, user) => Boolean(
+  document?.uploaderId && user?._id &&
+  String(document.uploaderId?._id || document.uploaderId) === String(user._id)
+);
+
 const sanitizeFileName = (name = "") => {
   const extension = path.extname(name || "");
   const baseName = path.basename(name, extension).trim();
@@ -403,7 +408,7 @@ exports.getDocumentById = async (req, res) => {
     const doc = await Document.findById(req.params.id)
       .populate("uploaderId", "name");
 
-    if (!doc || doc.status !== "approved") {
+    if (!doc || (doc.status !== "approved" && !isDocumentOwner(doc, req.user))) {
       return res.status(404).json({ message: "Không tìm thấy tài liệu" });
     }
 
@@ -425,7 +430,7 @@ exports.getDocumentById = async (req, res) => {
 exports.previewDocument = async (req, res) => {
   try {
     const document = await Document.findById(req.params.id).lean();
-    if (!document || document.status !== "approved") {
+    if (!document || (document.status !== "approved" && !isDocumentOwner(document, req.user))) {
       return res.status(404).json({ message: "Tài liệu không tồn tại hoặc chưa được công khai" });
     }
     return await sendSafeDocumentPreview(document, res);

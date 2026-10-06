@@ -38,6 +38,12 @@ const STATUS_CONFIG = {
   },
 };
 
+const DOCUMENT_STATUS_LABEL = {
+  approved: "Đã duyệt",
+  pending: "Chờ duyệt",
+  rejected: "Bị từ chối",
+};
+
 function formatDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("vi-VN", {
@@ -49,7 +55,7 @@ function formatDate(iso) {
   });
 }
 
-export default function MyReports() {
+export default function MyReports({ embedded = false }) {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -96,9 +102,9 @@ export default function MyReports() {
   });
 
   return (
-    <div className="reports-page page-shell max-w-5xl space-y-6 text-left pb-10">
+    <div className={embedded ? "profile-reports space-y-5 text-left" : "reports-page page-shell max-w-5xl space-y-6 text-left pb-10"}>
       {/* Breadcrumbs */}
-      <nav className="flex items-center gap-1.5 text-xs text-muted-foreground ">
+      {!embedded && <nav className="flex items-center gap-1.5 text-xs text-muted-foreground ">
         <Link to="/" className="hover:text-primary transition-colors">
           Trang chủ
         </Link>
@@ -108,11 +114,24 @@ export default function MyReports() {
         </Link>
         <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         <span className="font-semibold text-foreground ">Báo cáo của tôi</span>
-      </nav>
+      </nav>}
 
-      <PageHeading eyebrow="PHẢN HỒI CỦA BẠN" title="Báo cáo của tôi." description="Theo dõi tiến độ xử lý và phản hồi từ ban quản trị cho những tài liệu bạn đã báo cáo.">
-        <Button variant="outline" size="sm" onClick={fetchReports} disabled={loading} className="rounded-full gap-2"><RefreshCw className={loading ? "animate-spin" : ""} />Làm mới</Button>
-      </PageHeading>
+      {embedded ? (
+        <div className="profile-content-toolbar">
+          <div>
+            <p className="profile-content-kicker">PHẢN HỒI CỦA BẠN</p>
+            <h2>Báo cáo của tôi</h2>
+            <p>Theo dõi tiến độ xử lý và phản hồi từ ban quản trị cho những tài liệu bạn đã báo cáo.</p>
+          </div>
+          <div className="profile-toolbar-actions">
+            <Button variant="outline" size="sm" onClick={fetchReports} disabled={loading} className="rounded-xl gap-2"><RefreshCw size={15} className={loading ? "animate-spin" : ""} />Làm mới</Button>
+          </div>
+        </div>
+      ) : (
+        <PageHeading eyebrow="PHẢN HỒI CỦA BẠN" title="Báo cáo của tôi." description="Theo dõi tiến độ xử lý và phản hồi từ ban quản trị cho những tài liệu bạn đã báo cáo.">
+          <Button variant="outline" size="sm" onClick={fetchReports} disabled={loading} className="rounded-full gap-2"><RefreshCw className={loading ? "animate-spin" : ""} />Làm mới</Button>
+        </PageHeading>
+      )}
 
       {/* Stat Cards Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
@@ -234,6 +253,15 @@ export default function MyReports() {
               const StatusIcon = statusCfg.icon;
               const docId = report.documentId?._id || report.documentId?.id || report.documentId;
               const docTitle = report.documentId?.title || report.documentTitle || "Tài liệu học tập";
+              const documentStatus = report.documentId?.status;
+              const canOpenDocument = Boolean(docId) && (
+                documentStatus === "approved" ||
+                (!documentStatus && report.canViewDocument !== false) ||
+                report.canViewDocument === true
+              );
+              const documentLink = documentStatus && documentStatus !== "approved"
+                ? `/documents/${docId}/preview`
+                : `/document/${docId}`;
 
               return (
                 <div
@@ -261,17 +289,24 @@ export default function MyReports() {
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2">
                       <FileText className="w-4 h-4 text-primary shrink-0" />
-                      {report.documentId ? (
+                      {canOpenDocument ? (
                         <Link
-                          to={`/document/${docId}`}
+                          to={documentLink}
                           className="font-bold text-sm text-foreground hover:text-primary transition-colors flex items-center gap-1.5"
                         >
                           <span className="line-clamp-1">{docTitle}</span>
                           <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-60" />
                         </Link>
+                      ) : report.documentId ? (
+                        <span className="font-bold text-sm text-foreground">{docTitle}</span>
                       ) : (
                         <span className="text-sm font-semibold text-muted-foreground italic">
                           Tài liệu đã bị xóa khỏi hệ thống
+                        </span>
+                      )}
+                      {documentStatus && documentStatus !== "approved" && (
+                        <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                          Tài liệu: {DOCUMENT_STATUS_LABEL[documentStatus] || "Không công khai"}
                         </span>
                       )}
                     </div>
@@ -290,6 +325,16 @@ export default function MyReports() {
                             <span>{report.adminFeedback}</span>
                           </div>
                         </div>
+                      )}
+                      {report.status === "dismissed" && (
+                        <p className="text-[11px] leading-5 text-muted-foreground">
+                          Kết quả “Đã bỏ qua” chỉ áp dụng cho báo cáo; trạng thái duyệt tài liệu được quản lý riêng.
+                        </p>
+                      )}
+                      {report.canViewDocument && documentStatus === "rejected" && report.documentId?.moderationNote && (
+                        <p className="text-[11px] leading-5 text-destructive">
+                          Lý do từ chối tài liệu: {report.documentId.moderationNote}
+                        </p>
                       )}
                     </div>
                   </div>

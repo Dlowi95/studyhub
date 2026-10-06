@@ -114,6 +114,12 @@ const nextSubjectCode = (subjects) => {
 };
 
 // Reusable Sidebar Content Component for Desktop and Mobile Drawer
+const DOCUMENT_STATUS_LABELS = {
+  approved: "Đã duyệt",
+  pending: "Chờ duyệt",
+  rejected: "Bị từ chối",
+};
+
 function SidebarNav({
   activeTab,
   setActiveTab,
@@ -988,7 +994,7 @@ export default function AdminDashboard() {
     } else if (actionType === "resolve_delete") {
       setReportFeedbackText("Tài liệu vi phạm nghiêm trọng và đã bị xóa hoàn toàn khỏi hệ thống.");
     } else if (actionType === "dismiss") {
-      setReportFeedbackText("Tài liệu đã được kiểm duyệt lại và không vi phạm chính sách của StudyHub.");
+      setReportFeedbackText("Báo cáo không đủ căn cứ xử lý. Thao tác bỏ qua chỉ đóng báo cáo và không thay đổi trạng thái duyệt của tài liệu.");
     }
     setReportModalOpen(true);
   };
@@ -1014,8 +1020,10 @@ export default function AdminDashboard() {
         setSelectedReportForAction(null);
         fetchData();
         toast({
-          title: "Xử lý báo cáo thành công",
-          description: "Đã cập nhật trạng thái báo cáo và gửi thông báo phản hồi tới sinh viên.",
+          title: action === "dismiss" ? "Đã bỏ qua báo cáo" : "Đã xử lý báo cáo vi phạm",
+          description: action === "dismiss"
+            ? "Báo cáo đã đóng; trạng thái duyệt của tài liệu không bị thay đổi."
+            : "Tài liệu đã được xử lý theo quyết định vi phạm và người liên quan đã được thông báo.",
         });
       } else {
         const data = await reportRes.json();
@@ -2410,18 +2418,25 @@ export default function AdminDashboard() {
                               <TableRow key={report._id} className="border-border/60 hover:bg-card/40">
                                 <TableCell className="font-semibold text-xs text-foreground max-w-[200px]">
                                   {report.documentId ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const document = allDocs.find((doc) => (doc._id || doc.id) === docId);
-                                        if (document) void handleOpenPreview(document);
-                                        else toast({ variant: "destructive", title: "Chưa tải được tài liệu", description: "Vui lòng làm mới dữ liệu rồi thử lại." });
-                                      }}
-                                      className="hover:text-primary transition-colors line-clamp-1 flex items-center gap-1.5"
-                                    >
-                                      <span>{docTitle}</span>
-                                      <Eye className="w-3 h-3 shrink-0 opacity-50" />
-                                    </button>
+                                    <div className="space-y-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const document = allDocs.find((doc) => String(doc._id || doc.id) === String(docId));
+                                          if (document) void handleOpenPreview(document);
+                                          else toast({ variant: "destructive", title: "Chưa tải được tài liệu", description: "Vui lòng làm mới dữ liệu rồi thử lại." });
+                                        }}
+                                        className="hover:text-primary transition-colors line-clamp-1 flex items-center gap-1.5"
+                                      >
+                                        <span>{docTitle}</span>
+                                        <Eye className="w-3 h-3 shrink-0 opacity-50" />
+                                      </button>
+                                      {report.documentId?.status && (
+                                        <small className="block text-[10px] font-medium text-muted-foreground">
+                                          Tài liệu: {DOCUMENT_STATUS_LABELS[report.documentId.status] || "Không công khai"}
+                                        </small>
+                                      )}
+                                    </div>
                                   ) : (
                                     <span>{docTitle}<small className="block text-muted-foreground">Đã xóa khỏi hệ thống</small></span>
                                   )}

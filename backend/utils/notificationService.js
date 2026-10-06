@@ -162,7 +162,7 @@ const notifyReportStatus = async (report) => {
     title: resolved ? "Báo cáo vi phạm đã được xử lý" : "Báo cáo vi phạm đã được xem xét",
     message: resolved
       ? `Báo cáo của bạn về tài liệu “${documentTitle}” đã được chấp thuận và xử lý.${feedback}`
-      : `Báo cáo của bạn về tài liệu “${documentTitle}” đã được xem xét và bỏ qua.${feedback}`,
+      : `Báo cáo của bạn về tài liệu “${documentTitle}” đã được xem xét và bỏ qua. Thao tác này chỉ đóng báo cáo, không thay đổi trạng thái duyệt của tài liệu.${feedback}`,
     link: "/my-reports",
     relatedDocumentId: report.documentId?._id || report.documentId,
     relatedReportId: report._id,

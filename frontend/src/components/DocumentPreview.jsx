@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { normalizeFileUrl } from "@/lib/file-url";
+import { interactionHeaders } from "@/lib/interaction";
 
 const SAFE_PREVIEW_FORMATS = new Set(["pdf", "txt", "docx", "pptx", "xlsx"]);
 const LEGACY_OFFICE_FORMATS = new Set(["doc", "ppt", "xls"]);
@@ -125,6 +126,7 @@ export default function DocumentPreview({ document, onDownload, onAvailabilityCh
       try {
         const response = await fetch(`${API_URL}/documents/${documentId}/preview`, {
           signal: controller.signal,
+          headers: interactionHeaders(),
         });
 
         if (!response.ok) {

@@ -99,10 +99,29 @@ exports.checkReportStatus = async (req, res) => {
 exports.getMyReports = async (req, res) => {
   try {
     const reports = await Report.find({ reporterId: req.user._id })
-      .populate('documentId', 'title')
+      .populate('documentId', 'title status uploaderId moderationNote')
       .sort({ createdAt: -1 });
 
-    res.json({ reports });
+    const safeReports = reports.map((report) => {
+      const result = report.toObject();
+      const document = result.documentId;
+      if (!document) {
+        result.canViewDocument = false;
+        return result;
+      }
+
+      result.canViewDocument = document.status === 'approved' ||
+        String(document.uploaderId?._id || document.uploaderId) === String(req.user._id);
+      result.documentId = {
+        _id: document._id,
+        title: document.title,
+        status: document.status,
+        moderationNote: result.canViewDocument ? document.moderationNote : '',
+      };
+      return result;
+    });
+
+    res.json({ reports: safeReports });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Lỗi server khi lấy báo cáo của bạn' });
@@ -116,7 +135,7 @@ exports.getAllReports = async (req, res) => {
     const filter = req.user?.role === 'moderator' ? { status: 'pending' } : (status ? { status } : {});
 
     const reports = await Report.find(filter)
-      .populate('documentId', 'title fileUrl')
+      .populate('documentId', 'title fileUrl status')
       .populate('reporterId', req.user?.role === 'moderator' ? 'name' : 'name email')
       .populate('handledBy', 'name')
       .sort({ createdAt: -1 });
@@ -153,7 +172,7 @@ exports.updateReportStatus = async (req, res) => {
       return res.status(400).json({ message: 'Trạng thái không hợp lệ' });
     }
 
-    const report = await Report.findById(id).populate('documentId', 'title');
+    const report = await Report.findById(id).populate('documentId', 'title status');
     if (!report) {
       return res.status(404).json({ message: 'Không tìm thấy báo cáo' });
     }

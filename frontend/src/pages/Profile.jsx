@@ -2,8 +2,9 @@ import { API_URL } from "@/lib/api";
 import { clearAccountSession } from "@/lib/session";
 import PageHeading from "@/components/PageHeading";
 import Pagination from "@/components/Pagination";
+import MyReports from "@/pages/MyReports";
 import { useEffect, useState, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +33,18 @@ import {
   Loader2,
 } from "lucide-react";
 
+const PROFILE_TABS = new Set(["uploads", "saved", "downloads", "account", "reports"]);
+
+const getProfileTabFromLocation = (pathname, search) => {
+  if (pathname === "/my-reports") return "reports";
+  const requestedTab = new URLSearchParams(search).get("tab");
+  return PROFILE_TABS.has(requestedTab) ? requestedTab : "uploads";
+};
+
 export default function Profile() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeTab = getProfileTabFromLocation(location.pathname, location.search);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [docsLoading, setDocsLoading] = useState(true);
@@ -42,7 +54,6 @@ export default function Profile() {
   const [documentsPagination, setDocumentsPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
   const [documentsReloadKey, setDocumentsReloadKey] = useState(0);
   const documentsRequestRef = useRef(0);
-  const [activeTab, setActiveTab] = useState("uploads"); // "uploads" | "saved" | "downloads" | "account"
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // "all" | "approved" | "pending" | "rejected"
   const [deletingId, setDeletingId] = useState(null);
@@ -60,9 +71,17 @@ export default function Profile() {
   const [downloadHistory, setDownloadHistory] = useState([]);
   const [followSummary, setFollowSummary] = useState({ followers: 0, following: 0 });
 
-  const navigate = useNavigate();
   const { toast } = useToast();
   const apiUrl = API_URL;
+
+  const selectProfileTab = (tab) => {
+    const target = tab === "reports"
+      ? "/my-reports"
+      : tab === "uploads"
+        ? "/profile"
+        : `/profile?tab=${encodeURIComponent(tab)}`;
+    if (`${location.pathname}${location.search}` !== target) navigate(target);
+  };
 
   // 1. Fetch User Profile
   const fetchProfile = async () => {
@@ -430,11 +449,11 @@ export default function Profile() {
             </div>
           </div>
           <nav className="profile-side-nav" aria-label="Các mục hồ sơ">
-            <button type="button" className={activeTab === "account" ? "is-active" : ""} aria-pressed={activeTab === "account"} onClick={() => setActiveTab("account")}><User size={17} /><span>Tài khoản</span></button>
-            <button type="button" className={activeTab === "uploads" ? "is-active" : ""} aria-pressed={activeTab === "uploads"} onClick={() => setActiveTab("uploads")}><FileText size={17} /><span>Tài liệu của tôi</span><span className="profile-nav-count">{stats.total}</span></button>
-            <button type="button" className={activeTab === "saved" ? "is-active" : ""} aria-pressed={activeTab === "saved"} onClick={() => setActiveTab("saved")}><Bookmark size={17} /><span>Đã lưu</span>{savedDocs.length > 0 && <span className="profile-nav-count">{savedDocs.length}</span>}</button>
-            <button type="button" className={activeTab === "downloads" ? "is-active" : ""} aria-pressed={activeTab === "downloads"} onClick={() => setActiveTab("downloads")}><Download size={17} /><span>Đã tải về</span>{downloadHistory.length > 0 && <span className="profile-nav-count">{downloadHistory.length}</span>}</button>
-            <Link to="/my-reports"><ShieldAlert size={17} /><span>Báo cáo của tôi</span></Link>
+            <button type="button" className={activeTab === "account" ? "is-active" : ""} aria-pressed={activeTab === "account"} onClick={() => selectProfileTab("account")}><User size={17} /><span>Tài khoản</span></button>
+            <button type="button" className={activeTab === "uploads" ? "is-active" : ""} aria-pressed={activeTab === "uploads"} onClick={() => selectProfileTab("uploads")}><FileText size={17} /><span>Tài liệu của tôi</span><span className="profile-nav-count">{stats.total}</span></button>
+            <button type="button" className={activeTab === "saved" ? "is-active" : ""} aria-pressed={activeTab === "saved"} onClick={() => selectProfileTab("saved")}><Bookmark size={17} /><span>Đã lưu</span>{savedDocs.length > 0 && <span className="profile-nav-count">{savedDocs.length}</span>}</button>
+            <button type="button" className={activeTab === "downloads" ? "is-active" : ""} aria-pressed={activeTab === "downloads"} onClick={() => selectProfileTab("downloads")}><Download size={17} /><span>Đã tải về</span>{downloadHistory.length > 0 && <span className="profile-nav-count">{downloadHistory.length}</span>}</button>
+            <Link to="/my-reports" className={activeTab === "reports" ? "is-active" : ""} aria-current={activeTab === "reports" ? "page" : undefined}><ShieldAlert size={17} /><span>Báo cáo của tôi</span></Link>
           </nav>
           <div className="profile-sidebar-actions">
             <Button type="button" onClick={handleOpenUpload} className="w-full justify-center gap-2"><UploadCloud size={16} />Đăng tài liệu mới</Button>
@@ -443,10 +462,10 @@ export default function Profile() {
           </div>
         </aside>
         <main className="profile-content">
-        <div className="profile-content-toolbar">
+        {activeTab !== "reports" && <div className="profile-content-toolbar">
           <div><p className="profile-content-kicker">KHÔNG GIAN CÁ NHÂN</p><h2>{activeTab === "uploads" ? "Tài liệu của tôi" : activeTab === "saved" ? "Tài liệu đã lưu" : activeTab === "downloads" ? "Lịch sử tải xuống" : "Chi tiết tài khoản"}</h2><p>Quản lý hoạt động học tập của bạn trên StudyHub.</p></div>
           <div className="profile-toolbar-actions"><Button variant="outline" size="sm" onClick={() => { setDocumentsReloadKey((key) => key + 1); fetchProfile(); }} disabled={docsLoading} className="rounded-xl border-border gap-2"><RefreshCw size={15} className={docsLoading ? "animate-spin" : ""} />Làm mới</Button><Button size="sm" onClick={handleOpenUpload} className="rounded-xl gap-2"><UploadCloud size={15} />Đăng tài liệu</Button></div>
-        </div>
+        </div>}
       {/* Upload metrics belong to the uploads section only. */}
       {activeTab === "uploads" && <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Stat 1: Total Uploads */}
@@ -676,16 +695,30 @@ export default function Profile() {
 
                       {/* Right side: Actions */}
                       <div className="profile-document-actions">
-                        <Link to={`/document/${doc._id}`}>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="profile-doc-action profile-doc-action-view"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            Xem tài liệu
-                          </Button>
-                        </Link>
+                        {doc.status === "approved" ? (
+                          <Link to={`/document/${doc._id}`}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="profile-doc-action profile-doc-action-view"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              Xem tài liệu
+                            </Button>
+                          </Link>
+                        ) : (
+                          <Link to={`/documents/${doc._id}/preview`}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="profile-doc-action profile-doc-action-view"
+                              title="Mở bản riêng của tài liệu chưa công khai"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              Xem bản riêng
+                            </Button>
+                          </Link>
+                        )}
 
                         {/* Delete confirmation flow */}
                         {isConfirming ? (
@@ -946,6 +979,7 @@ export default function Profile() {
           </div>
           </div>
         )}
+        {activeTab === "reports" && <MyReports embedded />}
         </div>
       </main>
       </div>

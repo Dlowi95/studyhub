@@ -8,9 +8,12 @@ import DocumentDetailReviews from "@/components/DocumentDetailReviews";
 import DocumentVariantSelector from "@/components/DocumentVariantSelector";
 import DocumentPreview from "@/components/DocumentPreview";
 import ReportModal from "@/components/ReportModal";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { normalizeFileUrl } from "@/lib/file-url";
+import { getDocumentExtension, getDocumentPreviewPath, getSuggestedDownloadName, normalizeDownloadName } from "@/lib/document-preview";
 import { interactionHeaders } from "@/lib/interaction";
 import {
   ChevronRight,
@@ -54,6 +57,7 @@ const normalizeDocument = (doc) => ({
   downloadCount: doc.downloadCount || 0,
   avgRating: doc.avgRating || 0,
   uploaderId: doc.uploaderId,
+  moderationNote: doc.moderationNote || "",
   fileAvailable: doc.fileAvailable,
   fileIssue: doc.fileIssue || "",
   storageProvider: doc.storageProvider || "",
@@ -82,6 +86,8 @@ export default function DocumentDetailPage() {
   const [avgRating, setAvgRating] = useState(null);
   const [fileAvailability, setFileAvailability] = useState({ state: "checking", message: "" });
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadPromptDocument, setDownloadPromptDocument] = useState(null);
+  const [downloadNameDraft, setDownloadNameDraft] = useState("");
 
   // Report modal & status state
   const [reportModalOpen, setReportModalOpen] = useState(false);
@@ -116,7 +122,7 @@ export default function DocumentDetailPage() {
         setLoading(true);
         setError("");
 
-        const detailRes = await fetch(`${apiUrl}/documents/${id}`);
+        const detailRes = await fetch(`${apiUrl}/documents/${id}`, { headers: interactionHeaders() });
         const detailData = await detailRes.json();
 
         if (!detailRes.ok) {
@@ -250,7 +256,7 @@ export default function DocumentDetailPage() {
     }
   };
 
-  const handleDownload = async (docItem) => {
+  const handleDownload = async (docItem, requestedName) => {
     if (!docItem?.fileUrl || isDownloading) return;
 
     if (docItem.fileAvailable === false || fileAvailability.state === "missing") {
@@ -266,19 +272,19 @@ export default function DocumentDetailPage() {
     }
 
     const safeUrl = normalizeFileUrl(docItem.fileUrl);
-    const supportedExtensions = new Set(["pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "txt"]);
-    const documentType = String(docItem.type || "").toLowerCase();
-    let downloadName = (docItem.fileName || docItem.title || "tai-lieu").trim();
-
-    if (!/\.[a-z0-9]{1,8}$/i.test(downloadName) && supportedExtensions.has(documentType)) {
-      downloadName = `${downloadName}.${documentType}`;
-    }
-
-    downloadName = downloadName.replace(/[\\/:*?"<>|]/g, "-");
+    const downloadName = normalizeDownloadName(
+      requestedName || getSuggestedDownloadName(docItem),
+      docItem
+    );
     setIsDownloading(true);
 
     try {
-      const fileResponse = await fetch(safeUrl);
+      const requestedFileUrl = new URL(safeUrl, window.location.origin);
+      const apiOrigin = new URL(apiUrl, window.location.origin).origin;
+      const fileRequestOptions = requestedFileUrl.origin === apiOrigin
+        ? { headers: interactionHeaders() }
+        : undefined;
+      const fileResponse = await fetch(safeUrl, fileRequestOptions);
       if (!fileResponse.ok) {
         throw new Error(`Máy chủ trả về lỗi ${fileResponse.status}`);
       }
@@ -352,6 +358,28 @@ export default function DocumentDetailPage() {
     setIsDownloading(false);
   };
 
+  const requestDownload = (docItem) => {
+    if (!docItem?.fileUrl || isDownloading) return;
+    if (docItem.fileAvailable === false || fileAvailability.state === "missing") {
+      toast({
+        variant: "destructive",
+        title: "Tệp nguồn không còn khả dụng",
+        description: fileAvailability.message || docItem.fileIssue || "Người đăng cần tải lại tài liệu trước khi bạn có thể tải xuống.",
+      });
+      return;
+    }
+    setDownloadPromptDocument(docItem);
+    setDownloadNameDraft(getSuggestedDownloadName(docItem));
+  };
+
+  const confirmDownload = () => {
+    if (!downloadPromptDocument) return;
+    const documentToDownload = downloadPromptDocument;
+    const fileName = normalizeDownloadName(downloadNameDraft, documentToDownload);
+    setDownloadPromptDocument(null);
+    void handleDownload(documentToDownload, fileName);
+  };
+
   const fileUnavailable = activeDoc?.fileAvailable === false || fileAvailability.state === "missing";
 
   if (loading) {
@@ -406,6 +434,12 @@ export default function DocumentDetailPage() {
       </nav>
 
       {/* 2. DOCUMENT STATUS BANNER */}
+      {doc.status !== "approved" && <div className="rounded-2xl border border-warning/70 bg-warning/10 p-4 text-sm text-foreground">
+        <strong>{doc.status === "rejected" ? "Bản riêng · Tài liệu bị từ chối" : "Bản riêng · Đang chờ kiểm duyệt"}</strong>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          Chỉ chủ sở hữu mới xem được tài liệu này. {doc.moderationNote || "Tài liệu chưa được công khai."}
+        </p>
+      </div>}
       {fileUnavailable && <div className="flex items-center justify-between gap-3 rounded-2xl border border-warning/90 bg-warning/10 p-3.5 px-4 shadow-xs">
         <div className="flex items-center gap-2.5">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-warning bg-warning/10 text-warning"><AlertTriangle className="h-4 w-4" /></span>
@@ -455,7 +489,7 @@ export default function DocumentDetailPage() {
                   disabled={fileUnavailable}
                   onClick={() => {
                     if (!fileUnavailable) {
-                      window.open(normalizeFileUrl(activeDoc.fileUrl), "_blank", "noopener,noreferrer");
+                      window.open(getDocumentPreviewPath(activeDoc.id), "_blank", "noopener,noreferrer");
                     }
                   }}
                   className="rounded-xl border-border text-xs font-semibold gap-1.5 h-8 hover:bg-muted "
@@ -469,7 +503,7 @@ export default function DocumentDetailPage() {
             <DocumentPreview
               key={activeDoc.id}
               document={activeDoc}
-              onDownload={handleDownload}
+              onDownload={requestDownload}
               onAvailabilityChange={handleAvailabilityChange}
             />
           </div>
@@ -510,7 +544,7 @@ export default function DocumentDetailPage() {
             <div className="p-5">
               <DocumentDetailActions
                 doc={activeDoc}
-                onDownload={handleDownload}
+                onDownload={requestDownload}
                 isDownloading={isDownloading}
                 onReport={openReportModal}
                 hasReported={hasReported}
@@ -553,6 +587,45 @@ export default function DocumentDetailPage() {
           });
         }}
       />
+
+      <Dialog
+        open={Boolean(downloadPromptDocument)}
+        onOpenChange={(open) => {
+          if (!open && !isDownloading) setDownloadPromptDocument(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Đặt tên tệp tải xuống</DialogTitle>
+            <DialogDescription>
+              Anh có thể sửa tên để tránh lỗi mã hóa ký tự. Tệp gốc không bị thay đổi.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label htmlFor="download-file-name" className="text-sm font-semibold text-foreground">Tên tệp</label>
+            <Input
+              id="download-file-name"
+              autoFocus
+              value={downloadNameDraft}
+              maxLength={180}
+              onChange={(event) => setDownloadNameDraft(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter") confirmDownload(); }}
+              placeholder="Nhập tên dễ nhớ"
+            />
+            <p className="text-xs text-muted-foreground">
+              Định dạng .{downloadPromptDocument ? getDocumentExtension(downloadPromptDocument) : ""} sẽ được giữ nguyên.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDownloadPromptDocument(null)} disabled={isDownloading}>
+              Hủy
+            </Button>
+            <Button type="button" onClick={confirmDownload} disabled={isDownloading || !downloadNameDraft.trim()}>
+              Tải xuống
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
